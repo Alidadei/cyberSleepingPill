@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="赛博睡眠社区 cyberSleep——一个专门收录让人犯困内容的打分网站，数据联通「睡眠站台」APP。无广告 · 无追踪 · 无账号。">
+  <meta name="description" content="致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方。赛博睡眠社区收录让人犯困的内容并打分，数据联通「睡眠站台」APP。无广告 · 无追踪 · 无账号。">
   <title>电子安眠药 · 犯困内容打分网站</title>
   <!-- 分享卡片/搜索收录：必须静态写死——微信/QQ/Telegram/百度抓分享卡片时不执行 JS。
        换域名时同步改：本块 og:url/canonical、robots.txt、sitemap.xml -->
@@ -13,7 +13,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://alidadei.github.io/cyberSleepingPill/">
   <meta property="og:title" content="电子安眠药 · 犯困内容打分网站">
-  <meta property="og:description" content="赛博睡眠社区——一个专门收录让人犯困内容的打分网站，数据联通「睡眠站台」APP。无广告 · 无追踪 · 无账号。">
+  <meta property="og:description" content="致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方——赛博睡眠社区，收录让人犯困的内容并打分，与「睡眠站台」APP 数据联通。无广告 · 无追踪 · 无账号。">
   <meta property="og:image" content="https://alidadei.github.io/cyberSleepingPill/assets/og-cover.jpg">
   <meta property="og:image:secure_url" content="https://alidadei.github.io/cyberSleepingPill/assets/og-cover.jpg">
   <meta property="og:image:type" content="image/jpeg">
@@ -427,6 +427,31 @@
 
     .card .rate[aria-expanded="true"] {
       border-color: var(--accent)
+    }
+
+    .card .fav {
+      position: relative;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      color: var(--grey);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 4px 9px;
+      font-family: inherit;
+      transition: border-color .2s, color .2s
+    }
+
+    .card .fav:hover,
+    .card .fav.on {
+      border-color: var(--accent);
+      color: var(--accent)
+    }
+
+    .card .fav.on svg path {
+      fill: currentColor
     }
 
     .type {
@@ -1341,6 +1366,7 @@
   -->
       <button class="navitem focusable" id="navExport">导出</button>
       <button class="navitem focusable" id="navImport">导入</button>
+      <button class="navitem focusable" id="navFavs" aria-pressed="false">收藏</button>
       <button class="navitem focusable" id="navLetter" aria-haspopup="dialog">手书</button>
     </nav>
     <button class="hamburger focusable" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false">
@@ -1361,7 +1387,7 @@
               d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
           </svg></span><span id="brandTitle">电子安眠药</span></h1>
       <div class="brand-line"></div>
-      <div class="sub hand" id="subtitle">一个专门收录让人犯困内容的打分网站 · 数据联通「睡眠站台」APP</div>
+      <div class="sub hand" id="subtitle">致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方</div>
       <div id="tagNodes" class="nodes" aria-label="失眠类型星图">
         <input id="searchBox" class="search" placeholder="说说你为什么睡不着…（回车或输入即搜索）" aria-label="按失眠原因搜索">
       </div>
@@ -1422,6 +1448,7 @@
     ];
     const KEY = 'csc_community_picks';
     const SKEY = 'csc_sample_ratings';
+    const FAVKEY = 'csc_favorites';   /* 收藏：本机 urlKey 列表（样例与社区通用），与契约数据无关 */
     const PKEY = 'csc_profile';   /* 匿名画像：{ uid, nickname, age, gender, education } 全部选填 */
     const UKEY = 'csc_uid';       /* 匿名设备标识：首次生成后固定，用于画像 upsert */
 
@@ -1774,6 +1801,19 @@
       o[k] = arr.slice(-50);
       localStorage.setItem(SKEY, JSON.stringify(o));
     }
+    /* 收藏：点亮/熄灭书签并持久化；urlKey 与卡片一一对应 */
+    function favSet() {
+      try {
+        const o = JSON.parse(localStorage.getItem(FAVKEY));
+        return new Set(Array.isArray(o) ? o.filter(x => typeof x === 'string') : []);
+      } catch (e) { return new Set(); }
+    }
+    function toggleFav(k) {
+      const s = favSet();
+      if (s.has(k)) s.delete(k); else s.add(k);
+      try { localStorage.setItem(FAVKEY, JSON.stringify([...s])); } catch (e) { }
+      return s.has(k);
+    }
     /* 问候语已按站主要求移除（2026-09-10） */
     const STAR_PATH = 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
     function starMark() {
@@ -1826,6 +1866,18 @@
       const l = document.createElementNS(ns, 'line');
       l.setAttribute('x1', '16.5'); l.setAttribute('y1', '16.5'); l.setAttribute('x2', '21'); l.setAttribute('y2', '21');
       svg.appendChild(c); svg.appendChild(l);
+      return svg;
+    }
+    function bookmarkSvg() {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '14'); svg.setAttribute('height', '14');
+      svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linejoin', 'round');
+      const p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', 'M6 3h12v18l-6-4-6 4z');
+      svg.appendChild(p);
       return svg;
     }
 
@@ -2041,7 +2093,7 @@
       header.appendChild(back);
       const badge = document.createElement('span');
       badge.className = 'ranking-type-badge';
-      const typeName = typeKey === 'all' ? t('chip_all') : typeLabel(typeKey);
+      const typeName = typeKey === 'all' ? t('chip_all') : typeKey === 'favs' ? t('nav_favs') : typeLabel(typeKey);
       badge.textContent = '# ' + typeName;
       header.appendChild(badge);
       const searchBtn = document.createElement('button');
@@ -2082,6 +2134,15 @@
         let items;
         if (typeKey === 'all') {
           items = sortPicks(pool);
+        } else if (typeKey === 'favs') {
+          const favs = favSet();
+          const byUrl = new Map();
+          pool.filter(p => favs.has(urlKey(p.url))).forEach(p => {
+            const k = urlKey(p.url);
+            const cur = byUrl.get(k);
+            if (!cur || (cur.sample && !p.sample)) byUrl.set(k, p);   /* 同一链接：社区条目优先于样例 */
+          });
+          items = sortPicks([...byUrl.values()]);
         } else if (typeKey === 'none') {
           items = sortPicks(pool.filter(p => p.type == null || p.type === ''));
         } else {
@@ -2099,7 +2160,7 @@
           const empty = document.createElement('div');
           empty.className = 'hint';
           empty.style.margin = '20px 0';
-          empty.textContent = typeKey === 'all' ? t('empty_all') : t('empty_type');
+          empty.textContent = typeKey === 'all' ? t('empty_all') : typeKey === 'favs' ? t('favs_empty') : t('empty_type');
           listContainer.appendChild(empty);
           return;
         }
@@ -2223,6 +2284,23 @@
         };
         head.appendChild(rate);
       }
+      /* 收藏书签：样例与社区通用；收藏页里取消收藏 → 卡片即时离场 */
+      const fk = urlKey(url);
+      const favOn = favSet().has(fk);
+      const fav = document.createElement('button');
+      fav.type = 'button';
+      fav.className = 'fav focusable' + (favOn ? ' on' : '');
+      fav.setAttribute('aria-pressed', String(favOn));
+      fav.setAttribute('aria-label', favOn ? t('fav_remove') : t('fav_add'));
+      fav.appendChild(bookmarkSvg());
+      fav.onclick = () => {
+        const now = toggleFav(fk);
+        fav.classList.toggle('on', now);
+        fav.setAttribute('aria-pressed', String(now));
+        fav.setAttribute('aria-label', now ? t('fav_remove') : t('fav_add'));
+        if (currentRankingType === 'favs') rerenderRanking();
+      };
+      head.appendChild(fav);
       el.appendChild(head);
 
       const m = document.createElement('div');
@@ -2457,6 +2535,8 @@
     }
     /* 网站介绍：重播入场动画 */
     const aboutBtn = document.getElementById('navAbout'); if (aboutBtn) aboutBtn.onclick = () => playIntro();   /* 暂隐，恢复见 nav 注释 */
+    /* 收藏榜单页：本机收藏的书签合集 */
+    const favsBtn = document.getElementById('navFavs'); if (favsBtn) favsBtn.onclick = () => showRankingPage('favs');
     /* 搜索：首页搜索打开全部排行榜并传递搜索词 */
     let searchTimer = null;
     document.getElementById('searchBox').addEventListener('input', e => {
@@ -2488,8 +2568,10 @@
       zh: {
         doc_title: '电子安眠药 · 让人犯困内容的打分网站',
         brand: '电子安眠药',
-        subtitle: '一个专门收录让人犯困内容的打分网站 · 数据联通「睡眠站台」APP',
+        subtitle: '致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方',
         nav_prescribe: '推荐药方', nav_letter: '手书', nav_export: '导出', nav_import: '导入',
+        nav_favs: '收藏', fav_add: '收藏这条', fav_remove: '取消收藏',
+        favs_empty: '还没有收藏。点亮卡片右侧的书签，好内容就不会走丢',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
         form_title: '推荐任意让你犯困的小说、视频、播客…',
@@ -2549,8 +2631,10 @@
       en: {
         doc_title: 'Cyber Sleeping Pills · rate what makes you sleepy',
         brand: 'Cyber Sleeping Pills',
-        subtitle: 'A rating site for things that make you sleepy · synced with the Sleep Station app',
+        subtitle: 'To the anxious insomniac scrolling in the dark: this is where scrolling finally puts you to sleep.',
         nav_prescribe: 'Prescribe', nav_letter: 'Letter', nav_export: 'Export', nav_import: 'Import',
+        nav_favs: 'Saved', fav_add: 'Save this', fav_remove: 'Remove from saved',
+        favs_empty: 'Nothing saved yet — tap the bookmark on a card to keep it for a late night',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
         form_title: 'Recommend anything that lulls you to sleep — novels, videos, podcasts…',
@@ -2617,7 +2701,7 @@
     function applyLang() {
       document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
       document.title = t('doc_title');
-      set('navPublish', 'nav_prescribe'); set('navLetter', 'nav_letter'); set('navExport', 'nav_export'); set('navImport', 'nav_import');
+      set('navPublish', 'nav_prescribe'); set('navLetter', 'nav_letter'); set('navExport', 'nav_export'); set('navImport', 'nav_import'); set('navFavs', 'nav_favs');
       const lb = document.getElementById('navLang'); if (lb) lb.textContent = lang === 'zh' ? 'EN' : '中文';
       set('brandTitle', 'brand'); set('subtitle', 'subtitle');
       set('formTitle', 'form_title'); set('labelTitle', 'label_title'); set('labelUrl', 'label_url'); set('labelType', 'label_type');

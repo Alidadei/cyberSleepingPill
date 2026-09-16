@@ -10,7 +10,7 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 /* HTML 结构冒烟：关键 id 必须在标记里恰好出现一次（防解析层删改——桩按 id 注册，看不出结构缺失）。
    navAbout 已注释隐藏（保留 id 字符串即视为结构完整，恢复取消注释即可） */
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   const n = (html.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   if (n !== 1) throw new Error('HTML 结构错误: id="' + id + '" 出现 ' + n + ' 次（应为 1 次）');
 }
@@ -135,7 +135,7 @@ class El {
 function makeEl(tag) { return new El(tag); }
 
 const registry = {};
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   registry[id] = makeEl(id === 'fTitle' || id === 'fUrl' || id === 'fType' || id === 'searchBox' ? 'input' : 'div');
   registry[id].id = id;
 }
@@ -396,6 +396,24 @@ ok(liveNodes().some(n => n.children[1].textContent === 'Anxiety'), 'EN 下节点
 ok(cards().length === 2 && cards().every(c => c.children[1].textContent.includes('# Noise')), 'EN 下类型标签 # Noise（噪音型 2 张卡）', cards().length);
 g('navLang').onclick();
 ok(g('navPublish').textContent === '推荐药方' && g('brandTitle').textContent === '电子安眠药', '切回中文：推荐药方 / 电子安眠药');
+
+/* ---------- 12b. 收藏（书签 + 收藏榜单页） ---------- */
+clickNode('噪音干扰型');
+const favBtn0 = cards()[0].children[0].children[3];
+ok(favBtn0.getAttribute('aria-label') === '收藏这条', '卡片带书签按钮（未收藏态）');
+favBtn0.onclick();
+ok(favBtn0.getAttribute('aria-pressed') === 'true' && JSON.parse(localStorage.getItem('csc_favorites')).length === 1, '点亮书签 → 写入 csc_favorites');
+g('navFavs').onclick();
+ok(g('rankingOverlay').className.includes('open') && cards().length === 1, '收藏页只显示收藏的 1 条（同链接样例+社区去重）');
+ok(g('rankingOverlay').textContent.includes('# 收藏'), '收藏页徽标显示 # 收藏');
+const favBtn1 = cards()[0].children[0].children[3];
+favBtn1.onclick();
+ok(cards().length === 0 && g('rankingOverlay').textContent.includes('还没有收藏'), '收藏页内取消收藏 → 卡片即时离场并显示空态');
+ok(JSON.parse(localStorage.getItem('csc_favorites')).length === 0, '取消收藏同步写回本机');
+g('rankingOverlay').children[0].children[0].onclick();
+ok(!g('rankingOverlay').className.includes('open'), '返回键关闭收藏页');
+/* 重开榜单页：后续画像段（14）依赖榜单页顶部的画像卡 */
+g('navFavs').onclick();
 
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');

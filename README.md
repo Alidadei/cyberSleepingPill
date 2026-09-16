@@ -1,6 +1,6 @@
 # 赛博睡眠社区 cyberSleep 🌙
 
-**专门收藏让人犯困内容的平台网站**——安卓光闹钟应用 [睡眠站台](https://github.com/Alidadei/MySleep) 的姊妹项目。
+**致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方。**——安卓光闹钟应用 [睡眠站台](https://github.com/Alidadei/MySleep) 的姊妹项目。
 
 在这里你可以：
 
