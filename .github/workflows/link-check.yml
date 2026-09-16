@@ -1,0 +1,24 @@
+# 死链巡检：每日自动探测社区推荐的外链死活（见 tools/link-check.mjs 头注）。
+# 手动触发：仓库 Actions 页 → link-check → Run workflow（可选勾选 retry 次数之外的场景参数在脚本里改）。
+# 凭证说明：anon key 为公开值（脚本内置缺省），只需探测+投票时无需配任何 Secret；
+#   若要启用 --prune 自动删除 / 复活撤票，需在仓库 Secrets 配 SUPABASE_SERVICE_ROLE（Supabase → Settings → API）。
+name: link-check
+on:
+  schedule:
+    - cron: '17 21 * * *'   # 每天 UTC 21:17 ≈ 北京时间凌晨 5:17 低峰
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tools/link-check.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
