@@ -1101,6 +1101,16 @@
       line-height: 1.1
     }
 
+    .favs-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      flex-shrink: 0
+    }
+
     .ranking-mini {
       position: static;
       font-size: 13px;
@@ -1108,11 +1118,10 @@
     }
 
     .ranking-io-msg {
-      width: 100%;
       text-align: center;
       color: var(--sub);
       font-size: 13px;
-      margin-top: 8px
+      margin: -4px 0 12px
     }
 
     .ranking-search-btn {
@@ -2147,31 +2156,6 @@
       const typeName = typeKey === 'all' ? t('chip_all') : typeKey === 'favs' ? t('nav_favs') : typeLabel(typeKey);
       badge.textContent = '# ' + typeName;
       header.appendChild(badge);
-      let favIo = null;
-      if (typeKey === 'favs') {
-        /* 收藏页专属：导出/导入（与 APP「睡眠站台」收藏文件互通） */
-        const ex = document.createElement('button');
-        ex.type = 'button';
-        ex.className = 'ranking-back ranking-mini';
-        ex.textContent = t('favs_export');
-        ex.onclick = () => {
-          const blob = new Blob([JSON.stringify(buildFavsExport(), null, 2)], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'sleep_station_favorites.json';
-          a.click();
-        };
-        header.appendChild(ex);
-        const im = document.createElement('button');
-        im.type = 'button';
-        im.className = 'ranking-back ranking-mini';
-        im.textContent = t('favs_import');
-        im.onclick = () => { const inp = document.getElementById('favFileImport'); if (inp && inp.click) inp.click(); };
-        header.appendChild(im);
-        favIo = document.createElement('div');
-        favIo.className = 'ranking-io-msg';
-        header.appendChild(favIo);
-      }
       const searchBtn = document.createElement('button');
       searchBtn.type = 'button';
       searchBtn.className = 'ranking-search-btn focusable';
@@ -2186,6 +2170,34 @@
       searchBox.setAttribute('aria-label', '搜索排行榜');
       header.appendChild(searchBox);
       overlay.appendChild(header);
+      let favIo = null;
+      if (typeKey === 'favs') {
+        /* 收藏页专属工具行：导出/导入（与 APP「睡眠站台」收藏文件互通），独立于标题行避免拥挤 */
+        const toolbar = document.createElement('div');
+        toolbar.className = 'favs-toolbar';
+        const ex = document.createElement('button');
+        ex.type = 'button';
+        ex.className = 'ranking-back ranking-mini';
+        ex.textContent = t('favs_export');
+        ex.onclick = () => {
+          const blob = new Blob([JSON.stringify(buildFavsExport(), null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'sleep_station_favorites.json';
+          a.click();
+        };
+        toolbar.appendChild(ex);
+        const im = document.createElement('button');
+        im.type = 'button';
+        im.className = 'ranking-back ranking-mini';
+        im.textContent = t('favs_import');
+        im.onclick = () => { const inp = document.getElementById('favFileImport'); if (inp && inp.click) inp.click(); };
+        toolbar.appendChild(im);
+        overlay.appendChild(toolbar);
+        favIo = document.createElement('div');
+        favIo.className = 'ranking-io-msg';
+        overlay.appendChild(favIo);
+      }
       searchBtn.onclick = () => {
         if (searchBox.classList.toggle('show')) { if (searchBox.focus) try { searchBox.focus(); } catch (e) { } }
         else if (searchBox.blur) try { searchBox.blur(); } catch (e) { }
@@ -2429,7 +2441,10 @@
         } else {
           m.appendChild(document.createTextNode(hostOf(url)));
         }
-        m.appendChild(document.createTextNode(' · ' + t('rec_times')(pick.recommendCount || 1)));
+        /* 站外导入的池外收藏没有 recommendCount，不显示推荐次数（未知 ≠ 1 次） */
+        if (pick.recommendCount != null) {
+          m.appendChild(document.createTextNode(' · ' + t('rec_times')(pick.recommendCount || 1)));
+        }
       } else if (builtin && builtin.sampleRatingAvg != null) {
         m.appendChild(starMark());
         m.appendChild(document.createTextNode(' ' + t('ratings')(builtin.sampleRatingAvg.toFixed(1), builtin.sampleRatingCount)));
