@@ -68,8 +68,8 @@ APP 端 Kotlin 词表（AdGuard.kt）与网站端 JS 词表均从此文件生成
 | APP | SharedPreferences `relax_favorites` → `community_picks_json`（Gson 数组） | 仅本机 |
 | 网站 | localStorage key `csc_community_picks`（JSON 数组） | 仅浏览器本机 |
 
-P0 两端**不直接互通**（无后端）。网站提供「导出 JSON / 导入 JSON」按钮，
-与 APP 的数据文件可以人工搬运对齐（字段一致，可直接互导）。
+P0 两端**不直接互通**（无后端）。原网站提供「导出 JSON / 导入 JSON」按钮，与 APP 的数据文件可人工搬运对齐（字段一致，可直接互导）。
+**2026-09-17**：该入口按站主决定从网站导航下线（社区数据以云端为唯一通道）；文件格式本身保留——APP 侧三页导入导出不变，网站收藏页的收藏导出/导入仍与 APP 收藏文件互通（RelaxItem 形状，见 AGENT_HANDOFF）。
 
 ## 6. P1 数据互通（目标态，Supabase 免费档）
 

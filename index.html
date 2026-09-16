@@ -1384,12 +1384,11 @@
     <nav class="nav" id="mainNav" aria-label="Site navigation">
       <button class="navitem focusable" id="navLang" aria-label="Switch language">EN</button>
       <button class="navitem focusable" id="navPublish" aria-expanded="false" aria-controls="formPanel">推荐药方</button>
+      <button class="navitem focusable" id="navFavs" aria-pressed="false">收藏</button>
       <!-- 网站介绍入口暂时隐藏（playIntro 重播逻辑保留，恢复时取消注释即可）
   <button class="navitem focusable" id="navAbout">网站介绍</button>
   -->
-      <button class="navitem focusable" id="navExport">导出</button>
-      <button class="navitem focusable" id="navImport">导入</button>
-      <button class="navitem focusable" id="navFavs" aria-pressed="false">收藏</button>
+      <!-- 导出/导入（社区榜单文件迁移通道）已按站主决定下线（2026-09-17）：云端即唯一通道 -->
       <button class="navitem focusable" id="navLetter" aria-haspopup="dialog">手书</button>
     </nav>
     <button class="hamburger focusable" id="hamburgerBtn" aria-label="Toggle menu" aria-expanded="false">
@@ -1429,7 +1428,6 @@
         <button class="btn" id="fSubmit">提交推荐</button>
         <div class="msg" id="fMsg" aria-live="polite"></div>
         <div class="hint" id="formHint">含广告卖货 / 联系方式的内容会被直接拦下（与 APP 同一套 AdGuard 规则）</div>
-        <input type="file" id="fileImport" accept=".json" style="display:none">
         <input type="file" id="favFileImport" accept=".json" style="display:none">
       </div>
     </div>
@@ -1790,20 +1788,8 @@
       return items.slice().sort((a, b) =>
         avgOf(b) - avgOf(a) || countOf(b) - countOf(a) || (b.addedAt || 0) - (a.addedAt || 0));
     }
-    /* 导入行的合规化：字段/类型不符合契约 §1 的条目直接丢弃 */
-    function coercePick(o) {
-      if (!o || typeof o !== 'object') return null;
-      const title = typeof o.title === 'string' ? o.title.trim().slice(0, 80) : '';
-      const url = isValidUrl(o.url) ? normalizeUrl(o.url) : '';
-      if (!title || !url) return null;
-      const id = Number.isFinite(o.id) ? Math.trunc(o.id) : Date.now();
-      const ratings = Array.isArray(o.ratings)
-        ? o.ratings.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 5) : [];
-      const addedAt = Number.isFinite(o.addedAt) ? Math.trunc(o.addedAt) : id;
-      const type = TYPES.some(t => t.key === o.type) ? o.type : null;
-      const recommendCount = Number.isFinite(o.recommend_count) ? Math.trunc(o.recommend_count) : (Number.isFinite(o.recommendCount) && o.recommendCount > 0 ? Math.trunc(o.recommendCount) : 1);
-      return { id, title, url, type, ratings, addedAt, recommendCount };
-    }
+    /* coercePick（契约文件导入合规化）已随导航 导出/导入 入口一同下线（2026-09-17 站主决定：
+       社区数据以云端为唯一通道，站长直接读云端；文件格式保留在契约 §5 供 APP 互通） */
     function findDup(url) {
       const k = urlKey(url);
       return BUILTIN.find(p => urlKey(p.url) === k)
@@ -2555,49 +2541,7 @@
       }
     };
 
-    /* ================= 导出/导入（P0 迁移通道，契约 §5；导入按 id/URL 合并去重） ================= */
-    document.getElementById('navExport').onclick = async () => {
-      closeHamburger();
-      const data = await Store.load();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'cyberSleep_picks.json';
-      a.click();
-    };
-    document.getElementById('navImport').onclick = () => { closeHamburger(); document.getElementById('fileImport').click(); };
-    document.getElementById('fileImport').onchange = async e => {
-      const f = e.target.files[0];
-      e.target.value = '';
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = async () => {
-        let arr;
-        try { arr = JSON.parse(reader.result); } catch (err) { ioToast(false, t('import_bad_json')); return; }
-        if (!Array.isArray(arr)) { ioToast(false, t('import_bad_fmt')); return; }
-        const existing = await Store.load();
-        const seenIds = new Set(existing.map(p => p.id));
-        const seenUrls = new Set(existing.map(p => urlKey(p.url)));
-        const merged = existing.slice();
-        let added = 0, skipped = 0;
-        for (const raw of arr) {
-          const p = coercePick(raw);
-          if (!p || seenIds.has(p.id) || seenUrls.has(urlKey(p.url))) { skipped++; continue; }
-          seenIds.add(p.id); seenUrls.add(urlKey(p.url));
-          merged.push(p); added++;
-        }
-        try {
-          await Store.save(merged);
-          ioToast(true, t('import_ok')(added, skipped));
-          await refresh();
-        } catch (err) {
-          ioToast(false, t('import_fail'));
-        }
-      };
-      reader.readAsText(f);
-    };
-
-    /* ================= 导航栏：推荐面板 / 导出 / 导入 ================= */
+    /* ================= 导航栏：推荐面板 ================= */
     const formPanel = document.getElementById('formPanel');
     const navPublish = document.getElementById('navPublish');
     function closePanel() {
@@ -2674,14 +2618,7 @@
         }
       }, 400);
     });
-    let ioTimer = null;
-    function ioToast(ok, text) {
-      const m = document.getElementById('ioMsg');
-      m.className = 'msg toast ' + (ok ? 'ok' : 'bad');
-      m.textContent = text;
-      clearTimeout(ioTimer);
-      ioTimer = setTimeout(() => { m.className = 'msg toast'; m.textContent = ''; }, 4000);
-    }
+    /* ioToast 与 ioTimer 已随导航 导出/导入 入口下线；收藏页导入提示走榜单页内 .ranking-io-msg */
 
     /* ================= 中英双语（零依赖词典；语言存 localStorage，切换即时生效） ================= */
     const LANG_KEY = 'csc_lang';
@@ -2693,7 +2630,7 @@
         doc_title: '电子安眠药 · 让人犯困内容的打分网站',
         brand: '电子安眠药',
         subtitle: '致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方',
-        nav_prescribe: '推荐药方', nav_letter: '手书', nav_export: '导出', nav_import: '导入',
+        nav_prescribe: '推荐药方', nav_letter: '手书',
         nav_favs: '收藏', fav_add: '收藏这条', fav_remove: '取消收藏',
         favs_empty: '还没有收藏。点亮卡片右侧的书签，好内容就不会走丢',
         favs_export: '导出收藏', favs_import: '导入收藏',
@@ -2713,8 +2650,7 @@
         merged_ok: n => `已收录，推荐次数 +1（共被推荐 ${n} 次）`,
         rec_times: n => `被推荐 ${n} 次`,
         ad_contact: p => `未发布：疑似联系方式/短链：${p}`, ad_strong: k => `未发布：疑似推广关键词：${k}`, ad_weak: n => `未发布：广告特征过多（命中 ${n} 项）`,
-        import_ok: (a, s) => `已导入 ${a} 条${s ? ` · 跳过 ${s} 条重复/无效` : ''}`,
-        import_bad_json: 'JSON 解析失败', import_bad_fmt: '文件格式不对（需要 CommunityPick 数组，见数据契约 §1）', import_fail: '导入失败，请稍后再试',
+        import_bad_json: 'JSON 解析失败',
         rate_cta: '评分 ☆', rated: '已评分 ✓', rate_fail: '评分失败，请稍后再试',
         ratings: (a, n) => `${a} · ${n} 次评价`, sample_tag: '【样例】', in_app: 'APP 同款',
         in_app_title: '这条在 APP「睡眠站台」里也有',
@@ -2758,7 +2694,7 @@
         doc_title: 'Cyber Sleeping Pills · rate what makes you sleepy',
         brand: 'Cyber Sleeping Pills',
         subtitle: 'To the anxious insomniac scrolling in the dark: this is where scrolling finally puts you to sleep.',
-        nav_prescribe: 'Prescribe', nav_letter: 'Letter', nav_export: 'Export', nav_import: 'Import',
+        nav_prescribe: 'Prescribe', nav_letter: 'Letter',
         nav_favs: 'Saved', fav_add: 'Save this', fav_remove: 'Remove from saved',
         favs_empty: 'Nothing saved yet — tap the bookmark on a card to keep it for a late night',
         favs_export: 'Export saved', favs_import: 'Import saved',
@@ -2778,8 +2714,7 @@
         merged_ok: n => `Noted, recommendation count +1 (${n} total)`,
         rec_times: n => `Recommended ${n}×`,
         ad_contact: p => `Not published: looks like contact info / short link: ${p}`, ad_strong: k => `Not published: looks like an ad: ${k}`, ad_weak: n => `Not published: too many ad cues (${n} hits)`,
-        import_ok: (a, s) => `Imported ${a} item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`,
-        import_bad_json: 'Failed to parse JSON', import_bad_fmt: 'Wrong format (expected a CommunityPick array, see data contract §1)', import_fail: 'Import failed, please try again later',
+        import_bad_json: 'Failed to parse JSON',
         rate_cta: 'Rate ☆', rated: 'Rated ✓', rate_fail: 'Rating failed, please try again later',
         ratings: (a, n) => `${a} · ${n} ratings`, sample_tag: '[Sample] ', in_app: 'Also in app',
         in_app_title: 'This one also exists in the Sleep Station app',
@@ -2829,7 +2764,7 @@
     function applyLang() {
       document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN';
       document.title = t('doc_title');
-      set('navPublish', 'nav_prescribe'); set('navLetter', 'nav_letter'); set('navExport', 'nav_export'); set('navImport', 'nav_import'); set('navFavs', 'nav_favs');
+      set('navPublish', 'nav_prescribe'); set('navLetter', 'nav_letter'); set('navFavs', 'nav_favs');
       const lb = document.getElementById('navLang'); if (lb) lb.textContent = lang === 'zh' ? 'EN' : '中文';
       set('brandTitle', 'brand'); set('subtitle', 'subtitle');
       set('formTitle', 'form_title'); set('labelTitle', 'label_title'); set('labelUrl', 'label_url'); set('labelType', 'label_type');

@@ -10,7 +10,7 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 /* HTML 结构冒烟：关键 id 必须在标记里恰好出现一次（防解析层删改——桩按 id 注册，看不出结构缺失）。
    navAbout 已注释隐藏（保留 id 字符串即视为结构完整，恢复取消注释即可） */
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   const n = (html.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   if (n !== 1) throw new Error('HTML 结构错误: id="' + id + '" 出现 ' + n + ' 次（应为 1 次）');
 }
@@ -136,7 +136,7 @@ class El {
 function makeEl(tag) { return new El(tag); }
 
 const registry = {};
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   registry[id] = makeEl(id === 'fTitle' || id === 'fUrl' || id === 'fType' || id === 'searchBox' ? 'input' : 'div');
   registry[id].id = id;
 }
@@ -361,18 +361,14 @@ clickNode('噪音干扰型');
 docHandlers.keydown.forEach(fn => fn({ key: 'Escape' }));
 ok(!g('rankingOverlay').classList.contains('open') && !g('formPanel').classList.contains('open'), 'ESC 一并收起榜单/面板');
 
-/* ---------- 10. 导入合并去重 + APP 同款徽章 ---------- */
-const fileRow = [
-  { id: store()[0].id, title: '重复 id 的旧数据', url: 'https://old.example.com/1', type: null, ratings: [5], addedAt: 1 },
-  { id: 1720000000001, title: '雨声（与内置精选同款）', url: 'https://m.bilibili.com/search?keyword=%E9%9B%A8%E5%A3%B0%E5%8A%A9%E7%9C%A08%E5%B0%8F%E6%97%B6', type: 'noise', ratings: [4,5], addedAt: 1720000000001 },
-  { id: 1720000000002, title: '没链接的坏行', url: '', type: null, ratings: [], addedAt: 3 },
-  { id: 1720000000003, title: '今晚的篝火声', url: 'https://example.com/fire2', type: 'white-noise', addedAt: 1720000000003 },
-];
-g('fileImport').files = [{ content: JSON.stringify(fileRow) }];
-g('fileImport').onchange({ target: g('fileImport') });
-await sleep(50);
-ok(g('ioMsg').textContent.includes('已导入 2 条 · 跳过 2 条重复/无效'), '导入合并统计', g('ioMsg').textContent);
-ok(store().length === 4, '合并入库 4 条', store().length);
+/* ---------- 10. APP 同款徽章（社区数据与内置精选同链接）----------
+   原走文件导入路径播种，2026-09-17 导航 导出/导入 入口下线后改为直写本机库 + refresh() */
+storage.set('csc_community_picks', JSON.stringify([...store(), {
+  id: 1720000000001, title: '雨声（与内置精选同款）',
+  url: 'https://m.bilibili.com/search?keyword=%E9%9B%A8%E5%A3%B0%E5%8A%A9%E7%9C%A08%E5%B0%8F%E6%97%B6',
+  type: 'noise', ratings: [4, 5], addedAt: 1720000000001, recommendCount: 1
+}]));
+await sandbox.refresh();
 ensureNode('噪音干扰型');
 const twinCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
 ok(!!twinCard && twinCard.querySelectorAll('.twin').length === 1, '同款内容显示「APP 同款」徽章');
