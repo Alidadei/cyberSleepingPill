@@ -1864,7 +1864,7 @@
       });
       return [...m.values()].map((meta, i) => {
         const p = byUrl.get(urlKey(meta.url));
-        const url = meta.url || (p && p.url) || meta.key;
+        const url = normalizeUrl(meta.url || (p && p.url) || meta.key);
         return {
           id: Date.now() + i,
           title: (p && p.title) || meta.title || hostOf(url),
