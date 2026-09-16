@@ -454,6 +454,37 @@
       fill: currentColor
     }
 
+    .card .dead {
+      position: relative;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+      color: var(--grey);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 4px 9px;
+      font-family: inherit;
+      transition: border-color .2s, color .2s
+    }
+
+    .card .dead:hover,
+    .card .dead.done {
+      border-color: var(--bad);
+      color: var(--bad)
+    }
+
+    .card.stale {
+      opacity: .6
+    }
+
+    .dead-tag {
+      color: var(--bad);
+      font-size: 12px;
+      margin-left: 6px
+    }
+
     .type {
       display: inline-block;
       font-size: 12px;
@@ -1639,6 +1670,20 @@
           body: JSON.stringify(row)
         });
         if (!r.ok) throw new Error('profile ' + r.status);
+      },
+      /* 链接失效举报：link_reports 表（网站域数据，不进契约 §1）。(pick_id,uid) 唯一 → 一人一票自动去重 */
+      async reportDead(pickId) {
+        const r = await fetch(this.rest('link_reports'), {
+          method: 'POST',
+          headers: Object.assign({ Prefer: 'resolution=ignore-duplicates,return=minimal' }, await this.headers()),
+          body: JSON.stringify({ pick_id: String(pickId), uid: profileUid(), created_at: new Date().toISOString() })
+        });
+        if (!r.ok) throw new Error('reportDead ' + r.status);
+      },
+      async fetchDeadReports() {
+        const r = await fetch(this.rest('link_reports?select=pick_id,uid&limit=5000'), { headers: await this.headers() });
+        if (!r.ok) throw new Error('deadReports ' + r.status);
+        return r.json();
       }
     };
 
@@ -1926,6 +1971,44 @@
       svg.appendChild(p);
       return svg;
     }
+    function warnSvg() {
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('width', '14'); svg.setAttribute('height', '14');
+      svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linejoin', 'round');
+      const p = document.createElementNS(ns, 'path');
+      p.setAttribute('d', 'M12 3 2 21h20L12 3z');
+      svg.appendChild(p);
+      const l = document.createElementNS(ns, 'line');
+      l.setAttribute('x1', '12'); l.setAttribute('y1', '10'); l.setAttribute('x2', '12'); l.setAttribute('y2', '15');
+      svg.appendChild(l);
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', '12'); dot.setAttribute('cy', '17.6'); dot.setAttribute('r', '0.5');
+      svg.appendChild(dot);
+      return svg;
+    }
+
+    /* ================= 链接失效举报 =================
+       浏览器受 CORS 限制无法探测外链死活 → 社区举报制：
+       访客对社区条目点 ⚠ 上报（(pick_id,uid) 唯一，一人一票），同一 pick_id 有 ≥2 个
+       不同 uid 举报 → 卡片置灰 + 「多人报告」徽标；清理由站长在云端 dashboard 完成。
+       link_reports 是网站域数据，不进契约 §1。var/顶层函数供测试桩注入 */
+    var deadReports = [];       /* [{pick_id, uid}] */
+    const DEAD_THRESHOLD = 2;
+    function deadInfo(pickId) {
+      let n = 0, me = false;
+      const u = profileUid();
+      for (const r of deadReports) {
+        if (String(r.pick_id) === String(pickId)) { n++; if (r.uid === u) me = true; }
+      }
+      return { n, me };
+    }
+    async function reportDeadLink(pickId) {
+      if (!(Store && Store.reportDead)) return 'offline';   /* LocalStore（无云端）不提供举报 */
+      try { await Store.reportDead(pickId); return 'ok'; } catch (e) { return 'fail'; }
+    }
 
     /* ================= 渲染 ================= */
     let currentType = null;   /* null = 未点亮节点，榜单收起 */
@@ -1950,6 +2033,9 @@
         } else {
           loadMsg.textContent = t('load_fail_giveup');
         }
+      }
+      if (Store.fetchDeadReports) {
+        try { deadReports = await Store.fetchDeadReports(); } catch (e) { /* 举报数据拉取失败按无标记渲染 */ }
       }
       render();
     }
@@ -2408,6 +2494,32 @@
         if (currentRankingType === 'favs') rerenderRanking();
       };
       head.appendChild(fav);
+      /* 链接失效举报：仅社区条目（样例/收藏无对应云端行）；有云端才提供 */
+      if (isCommunity && pick && Store.reportDead) {
+        const dinfo = deadInfo(pick.id);
+        const dead = document.createElement('button');
+        dead.type = 'button';
+        dead.className = 'dead focusable' + (dinfo.me ? ' done' : '');
+        dead.title = dinfo.me ? t('dead_reported') : t('dead_report_tip');
+        dead.setAttribute('aria-label', dead.title);
+        dead.appendChild(warnSvg());
+        dead.onclick = async () => {
+          if (dead.classList.contains('done')) return;
+          dead.disabled = true;
+          const st = await reportDeadLink(pick.id);
+          if (st === 'ok') {
+            dead.classList.add('done');
+            dead.title = t('dead_reported');
+            dead.setAttribute('aria-label', dead.title);
+          } else if (st === 'fail') {
+            dead.title = t('dead_report_fail');
+            dead.setAttribute('aria-label', dead.title);
+            setTimeout(() => { dead.title = t('dead_report_tip'); }, 2500);
+          }
+          dead.disabled = false;
+        };
+        head.appendChild(dead);
+      }
       el.appendChild(head);
 
       const m = document.createElement('div');
@@ -2430,6 +2542,13 @@
         /* 站外导入的池外收藏没有 recommendCount，不显示推荐次数（未知 ≠ 1 次） */
         if (pick.recommendCount != null) {
           m.appendChild(document.createTextNode(' · ' + t('rec_times')(pick.recommendCount || 1)));
+        }
+        if (deadInfo(pick.id).n >= DEAD_THRESHOLD) {
+          el.classList.add('stale');
+          const tag = document.createElement('span');
+          tag.className = 'dead-tag';
+          tag.textContent = t('dead_badge');
+          m.appendChild(tag);
         }
       } else if (builtin && builtin.sampleRatingAvg != null) {
         m.appendChild(starMark());
@@ -2635,6 +2754,8 @@
         favs_empty: '还没有收藏。点亮卡片右侧的书签，好内容就不会走丢',
         favs_export: '导出收藏', favs_import: '导入收藏',
         favs_import_ok: (a, s) => `已导入 ${a} 条收藏${s ? ` · 跳过 ${s} 条重复/无效` : ''}`, favs_import_bad: '文件格式不对（需要收藏数组，可从 APP「睡眠站台」收藏页导出）',
+        dead_report_tip: '链接打不开？报告失效', dead_reported: '已收到反馈（重复只计一次）', dead_report_fail: '上报失败，请稍后再试',
+        dead_badge: '⚠ 多人报告：链接可能已失效',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
         form_title: '推荐任意让你犯困的小说、视频、播客…',
@@ -2699,6 +2820,8 @@
         favs_empty: 'Nothing saved yet — tap the bookmark on a card to keep it for a late night',
         favs_export: 'Export saved', favs_import: 'Import saved',
         favs_import_ok: (a, s) => `Imported ${a} saved item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`, favs_import_bad: 'Wrong format (expected a saved-items array, e.g. exported from the Sleep Station app)',
+        dead_report_tip: 'Link dead? Report it', dead_reported: 'Feedback received (duplicates counted once)', dead_report_fail: 'Failed to report, try again later',
+        dead_badge: '⚠ Several visitors: link may be dead',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
         form_title: 'Recommend anything that lulls you to sleep — novels, videos, podcasts…',

@@ -41,3 +41,27 @@ create policy "anon update" on community_picks
 -- 已有表升级 recommend_count（v1.2）：
 -- ALTER TABLE community_picks ADD COLUMN IF NOT EXISTS recommend_count int not null default 1;
 -- UPDATE community_picks SET recommend_count = 1 WHERE recommend_count IS NULL;
+
+-- ============================================================
+-- link_reports（v1.3 网站域数据，不进契约 §1）：链接失效举报
+-- 设计：匿名访客对某条推荐报告「链接打不开」；(pick_id, uid) 唯一 → 一人一票自动去重。
+-- 展示规则（网站端）：同一 pick_id 有 ≥2 个不同 uid 举报 → 卡片置灰 + 「多人报告链接可能已失效」徽标。
+-- 无 update/delete 策略 → anon 只能插和读；站长清理走 dashboard（service role）：
+--   查看汇总： select pick_id, count(distinct uid) as n from link_reports group by 1 order by n desc;
+--   清理死链： delete from community_picks where id = <pick_id>;  delete from link_reports where pick_id = <pick_id>;
+-- ============================================================
+create table if not exists public.link_reports (
+  pick_id    bigint   not null,          -- 对应 community_picks.id
+  uid        text     not null,          -- 匿名设备标识（csc_uid）
+  created_at timestamptz not null default now(),
+  primary key (pick_id, uid)
+);
+
+grant select, insert on public.link_reports to anon;
+alter table public.link_reports enable row level security;
+
+create policy "anon select reports" on public.link_reports
+  for select to anon using (true);
+
+create policy "anon insert report" on public.link_reports
+  for insert to anon with check (true);

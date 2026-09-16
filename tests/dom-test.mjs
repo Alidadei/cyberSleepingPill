@@ -446,6 +446,30 @@ ok(Array.isArray(exported) && exported.length === 2, '导出 JSON 含 2 条收�
 ok(lastA && lastA.download === 'sleep_station_favorites.json', '导出文件名与 APP 同名', lastA && lastA.download);
 ok(exported.every(x => x.isCustom === true && x.title && x.url), '导出条目为 RelaxItem 兼容形状（isCustom/title/url）');
 ok(exported.some(x => x.url === 'https://www.example.com/b/'), '导出保留原 URL 不改写');
+
+/* ---------- 12d. 链接失效举报（Local 模式隐藏按钮；SupabaseStore 载荷与徽标渲染直测） ---------- */
+ok(cards().every(c => c.querySelectorAll('.dead').length === 0), 'Local 模式不渲染举报按钮');
+ok(await sandbox.reportDeadLink('123') === 'offline', 'Local 模式 reportDeadLink 返回 offline');
+let capturedDead = null;
+sandbox.fetch = async (url, opts) => {
+  capturedDead = { url: String(url), method: opts && opts.method, body: opts && opts.body };
+  return { ok: true, status: 201 };
+};
+await sandbox.SupabaseStore.reportDead('1720000000001');
+ok(capturedDead.url.endsWith('/rest/v1/link_reports') && capturedDead.method === 'POST', '举报 POST 到 link_reports 表');
+const deadBody = JSON.parse(capturedDead.body);
+ok(deadBody.pick_id === '1720000000001' && typeof deadBody.uid === 'string' && deadBody.uid.length > 0, '举报载荷含 pick_id + 匿名 uid');
+/* 徽标渲染：≥2 个不同 uid → 卡片置灰 + 徽标；1 个 → 不标 */
+sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }];
+sandbox.showRankingPage('noise');
+const staleCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+ok(!!staleCard && staleCard.classList.contains('stale'), '≥2 人举报 → 卡片置灰');
+ok(!!staleCard && staleCard.querySelectorAll('.dead-tag')[0].textContent.includes('多人报告'), '置灰卡带「多人报告」徽标');
+sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }];
+sandbox.showRankingPage('noise');
+const freshCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+ok(!!freshCard && !freshCard.classList.contains('stale') && freshCard.querySelectorAll('.dead-tag').length === 0, '仅 1 人举报不标记（防单点误报）');
+sandbox.deadReports = [];
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();
