@@ -1101,6 +1101,20 @@
       line-height: 1.1
     }
 
+    .ranking-mini {
+      position: static;
+      font-size: 13px;
+      padding: 5px 12px
+    }
+
+    .ranking-io-msg {
+      width: 100%;
+      text-align: center;
+      color: var(--sub);
+      font-size: 13px;
+      margin-top: 8px
+    }
+
     .ranking-search-btn {
       display: inline-flex;
       align-items: center;
@@ -1407,6 +1421,7 @@
         <div class="msg" id="fMsg" aria-live="polite"></div>
         <div class="hint" id="formHint">含广告卖货 / 联系方式的内容会被直接拦下（与 APP 同一套 AdGuard 规则）</div>
         <input type="file" id="fileImport" accept=".json" style="display:none">
+        <input type="file" id="favFileImport" accept=".json" style="display:none">
       </div>
     </div>
 
@@ -1801,18 +1816,54 @@
       o[k] = arr.slice(-50);
       localStorage.setItem(SKEY, JSON.stringify(o));
     }
-    /* 收藏：点亮/熄灭书签并持久化；urlKey 与卡片一一对应 */
-    function favSet() {
+    /* 收藏：本机 csc_favorites 存 {key,title,url,type} 列表（key=urlKey；旧版纯字符串条目读取时自动迁移）。
+       站外导入的收藏（站内暂无对应内容）也保留原 title/url——收藏页直接成卡、导出原样带回。与契约数据无关 */
+    function favMap() {
       try {
         const o = JSON.parse(localStorage.getItem(FAVKEY));
-        return new Set(Array.isArray(o) ? o.filter(x => typeof x === 'string') : []);
-      } catch (e) { return new Set(); }
+        const m = new Map();
+        if (Array.isArray(o)) for (const x of o) {
+          if (typeof x === 'string') m.set(x, { title: '', url: x, type: null });
+          else if (x && typeof x.key === 'string') m.set(x.key, { title: String(x.title || ''), url: String(x.url || x.key), type: x.type || null });
+        }
+        return m;
+      } catch (e) { return new Map(); }
     }
-    function toggleFav(k) {
-      const s = favSet();
-      if (s.has(k)) s.delete(k); else s.add(k);
-      try { localStorage.setItem(FAVKEY, JSON.stringify([...s])); } catch (e) { }
-      return s.has(k);
+    function saveFavs(map) {
+      try { localStorage.setItem(FAVKEY, JSON.stringify([...map.values()])); } catch (e) { }
+    }
+    function toggleFav(k, meta) {
+      const m = favMap();
+      if (m.has(k)) m.delete(k);
+      else m.set(k, { key: k, title: (meta && meta.title) || '', url: (meta && meta.url) || k, type: (meta && meta.type) || null });
+      saveFavs(m);
+      return m.has(k);
+    }
+    /* 收藏导出：与 APP RelaxDataIO KIND_FAVORITES 同格式（RelaxItem 数组，Gson 宽松兼容），
+       文件名同为 sleep_station_favorites.json——APP「睡眠站台」导入零改动 */
+    function buildFavsExport() {
+      const m = favMap();
+      const byUrl = new Map();
+      [
+        ...BUILTIN.map(b => ({ title: b.title, url: b.url, type: b.type, sample: true })),
+        ...allPicks.map(p => ({ title: p.title, url: p.url, type: p.type, sample: false }))
+      ].forEach(p => {
+        const k = urlKey(p.url);
+        if (!m.has(k)) return;
+        const cur = byUrl.get(k);
+        if (!cur || (cur.sample && !p.sample)) byUrl.set(k, p);   /* 同一链接：社区条目优先于样例 */
+      });
+      return [...m.values()].map((meta, i) => {
+        const p = byUrl.get(urlKey(meta.url));
+        const url = meta.url || (p && p.url) || meta.key;
+        return {
+          id: Date.now() + i,
+          title: (p && p.title) || meta.title || hostOf(url),
+          url,
+          isCustom: true,
+          type: meta.type != null ? meta.type : ((p && p.type) || null)
+        };
+      });
     }
     /* 问候语已按站主要求移除（2026-09-10） */
     const STAR_PATH = 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z';
@@ -2096,6 +2147,31 @@
       const typeName = typeKey === 'all' ? t('chip_all') : typeKey === 'favs' ? t('nav_favs') : typeLabel(typeKey);
       badge.textContent = '# ' + typeName;
       header.appendChild(badge);
+      let favIo = null;
+      if (typeKey === 'favs') {
+        /* 收藏页专属：导出/导入（与 APP「睡眠站台」收藏文件互通） */
+        const ex = document.createElement('button');
+        ex.type = 'button';
+        ex.className = 'ranking-back ranking-mini';
+        ex.textContent = t('favs_export');
+        ex.onclick = () => {
+          const blob = new Blob([JSON.stringify(buildFavsExport(), null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'sleep_station_favorites.json';
+          a.click();
+        };
+        header.appendChild(ex);
+        const im = document.createElement('button');
+        im.type = 'button';
+        im.className = 'ranking-back ranking-mini';
+        im.textContent = t('favs_import');
+        im.onclick = () => { const inp = document.getElementById('favFileImport'); if (inp && inp.click) inp.click(); };
+        header.appendChild(im);
+        favIo = document.createElement('div');
+        favIo.className = 'ranking-io-msg';
+        header.appendChild(favIo);
+      }
       const searchBtn = document.createElement('button');
       searchBtn.type = 'button';
       searchBtn.className = 'ranking-search-btn focusable';
@@ -2135,12 +2211,15 @@
         if (typeKey === 'all') {
           items = sortPicks(pool);
         } else if (typeKey === 'favs') {
-          const favs = favSet();
+          const m = favMap();
           const byUrl = new Map();
-          pool.filter(p => favs.has(urlKey(p.url))).forEach(p => {
+          pool.filter(p => m.has(urlKey(p.url))).forEach(p => {
             const k = urlKey(p.url);
             const cur = byUrl.get(k);
             if (!cur || (cur.sample && !p.sample)) byUrl.set(k, p);   /* 同一链接：社区条目优先于样例 */
+          });
+          m.forEach((meta, k) => {   /* 池外收藏（含站外导入）也直接成卡 */
+            if (!byUrl.has(k)) byUrl.set(k, { title: meta.title || hostOf(meta.url), url: meta.url, type: meta.type, sample: false });
           });
           items = sortPicks([...byUrl.values()]);
         } else if (typeKey === 'none') {
@@ -2167,6 +2246,36 @@
         items.forEach((p, i) => listContainer.appendChild(cardFor(p, String(i + 1).padStart(2, '0'))));
       }
       renderRankingList('');
+      if (typeKey === 'favs') {
+        /* 收藏导入：接受 APP 导出的 RelaxItem 数组（title/url 必填，按 urlKey 合并去重） */
+        const inp = document.getElementById('favFileImport');
+        if (inp) inp.onchange = e => {
+          const f = e.target.files[0];
+          e.target.value = '';
+          if (!f) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            let arr;
+            try { arr = JSON.parse(reader.result); } catch (err) { favIo.textContent = t('import_bad_json'); return; }
+            if (!Array.isArray(arr)) { favIo.textContent = t('favs_import_bad'); return; }
+            const m = favMap();
+            let added = 0, skipped = 0;
+            for (const raw of arr) {
+              const title = raw && typeof raw.title === 'string' ? raw.title.trim() : '';
+              const url = raw && typeof raw.url === 'string' ? raw.url.trim() : '';
+              if (!title || !url || !isValidUrl(url)) { skipped++; continue; }
+              const k = urlKey(url);
+              if (m.has(k)) { skipped++; continue; }
+              m.set(k, { key: k, title, url, type: typeof raw.type === 'string' && raw.type ? raw.type : null });
+              added++;
+            }
+            if (added) saveFavs(m);
+            if (added) renderRankingList(searchBox.value);
+            favIo.textContent = t('favs_import_ok')(added, skipped);
+          };
+          reader.readAsText(f);
+        };
+      }
       let timer = null;
       searchBox.addEventListener('input', e => {
         clearTimeout(timer);
@@ -2286,7 +2395,7 @@
       }
       /* 收藏书签：样例与社区通用；收藏页里取消收藏 → 卡片即时离场 */
       const fk = urlKey(url);
-      const favOn = favSet().has(fk);
+      const favOn = favMap().has(fk);
       const fav = document.createElement('button');
       fav.type = 'button';
       fav.className = 'fav focusable' + (favOn ? ' on' : '');
@@ -2294,7 +2403,7 @@
       fav.setAttribute('aria-label', favOn ? t('fav_remove') : t('fav_add'));
       fav.appendChild(bookmarkSvg());
       fav.onclick = () => {
-        const now = toggleFav(fk);
+        const now = toggleFav(fk, { title, url, type: type || null });
         fav.classList.toggle('on', now);
         fav.setAttribute('aria-pressed', String(now));
         fav.setAttribute('aria-label', now ? t('fav_remove') : t('fav_add'));
@@ -2572,6 +2681,8 @@
         nav_prescribe: '推荐药方', nav_letter: '手书', nav_export: '导出', nav_import: '导入',
         nav_favs: '收藏', fav_add: '收藏这条', fav_remove: '取消收藏',
         favs_empty: '还没有收藏。点亮卡片右侧的书签，好内容就不会走丢',
+        favs_export: '导出收藏', favs_import: '导入收藏',
+        favs_import_ok: (a, s) => `已导入 ${a} 条收藏${s ? ` · 跳过 ${s} 条重复/无效` : ''}`, favs_import_bad: '文件格式不对（需要收藏数组，可从 APP「睡眠站台」收藏页导出）',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
         form_title: '推荐任意让你犯困的小说、视频、播客…',
@@ -2635,6 +2746,8 @@
         nav_prescribe: 'Prescribe', nav_letter: 'Letter', nav_export: 'Export', nav_import: 'Import',
         nav_favs: 'Saved', fav_add: 'Save this', fav_remove: 'Remove from saved',
         favs_empty: 'Nothing saved yet — tap the bookmark on a card to keep it for a late night',
+        favs_export: 'Export saved', favs_import: 'Import saved',
+        favs_import_ok: (a, s) => `Imported ${a} saved item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`, favs_import_bad: 'Wrong format (expected a saved-items array, e.g. exported from the Sleep Station app)',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
         form_title: 'Recommend anything that lulls you to sleep — novels, videos, podcasts…',

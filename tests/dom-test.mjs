@@ -10,7 +10,7 @@ const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 /* HTML 结构冒烟：关键 id 必须在标记里恰好出现一次（防解析层删改——桩按 id 注册，看不出结构缺失）。
    navAbout 已注释隐藏（保留 id 字符串即视为结构完整，恢复取消注释即可） */
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   const n = (html.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   if (n !== 1) throw new Error('HTML 结构错误: id="' + id + '" 出现 ' + n + ' 次（应为 1 次）');
 }
@@ -131,11 +131,12 @@ class El {
   }
   getBoundingClientRect() { return { x: 0, y: 0, width: 100, height: 20 }; }
   getContext() { return makeCtx(); }
+  click() { if (this.onclick) this.onclick(); }
 }
 function makeEl(tag) { return new El(tag); }
 
 const registry = {};
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','fileImport','ioMsg','navPublish','navExport','navImport','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   registry[id] = makeEl(id === 'fTitle' || id === 'fUrl' || id === 'fType' || id === 'searchBox' ? 'input' : 'div');
   registry[id].id = id;
 }
@@ -179,7 +180,7 @@ class Blob { constructor(parts) { this.parts = parts; } }
 
 const sandbox = {
   document, localStorage, sessionStorage, FileReader, Blob,
-  URL: Object.assign(URL, { createObjectURL: () => 'blob:x' }),
+  URL: Object.assign(URL, { createObjectURL: b => { globalThis.__lastBlob = b; return 'blob:x'; } }),
   fetch: () => Promise.reject(new Error('offline in tests')),
   AbortController,
   setInterval: () => 0,   /* 测试不真的轮询，也避免计时器挂住进程 */
@@ -415,6 +416,40 @@ ok(!g('rankingOverlay').className.includes('open'), '返回键关闭收藏页');
 /* 重开榜单页：后续画像段（14）依赖榜单页顶部的画像卡 */
 g('navFavs').onclick();
 
+/* ---------- 12c. 收藏导出/导入（与 APP sleep_station_favorites.json 互通） ---------- */
+const favBtnRow = [...g('rankingOverlay').querySelectorAll('button')];
+const importBtn = favBtnRow.find(b => b.textContent === '导入收藏');
+const exportBtn = favBtnRow.find(b => b.textContent === '导出收藏');
+ok(!!importBtn && !!exportBtn, '收藏页带 导出收藏/导入收藏 按钮');
+/* 导入：APP 导出的 RelaxItem 数组（含 www/尾斜杠变体与坏数据） */
+g('favFileImport').files = [{ content: JSON.stringify([
+  { id: 1, title: '站点A', url: 'https://example.com/a', isCustom: true },
+  { id: 2, title: '站点B', url: 'https://www.example.com/b/', isCustom: true },
+  { id: 3, title: '', url: 'https://example.com/c', isCustom: true }
+]) }];
+importBtn.onclick = () => { g('favFileImport').onchange({ target: g('favFileImport') }); };
+importBtn.onclick();
+await sleep(20);
+const favStoreAfterImport = JSON.parse(localStorage.getItem('csc_favorites'));
+ok(favStoreAfterImport.length === 2 && favStoreAfterImport.some(x => x.url === 'https://www.example.com/b/') && favStoreAfterImport.some(x => x.title === '站点A'), '导入 2 条有效收藏（原样 URL+标题入库）', JSON.stringify(favStoreAfterImport));
+ok(cards().length === 2, '导入的站外收藏直接成卡（池外条目可见）');
+ok(g('rankingOverlay').textContent.includes('站点B'), '导入后收藏页即时重渲染');
+ok(g('rankingOverlay').textContent.includes('已导入 2 条收藏 · 跳过 1 条'), '导入结果提示（含跳过计数）');
+/* 再导一次同文件：全部判重 */
+importBtn.onclick();
+await sleep(20);
+ok(g('rankingOverlay').textContent.includes('已导入 0 条收藏 · 跳过 3 条'), '重复导入全判重（urlKey 合并）');
+/* 导出：捕获 Blob 与下载文件名 */
+let lastA = null;
+const origCreate = document.createElement;
+document.createElement = tag => { const el = origCreate(tag); if (tag === 'a') lastA = el; return el; };
+exportBtn.onclick();
+document.createElement = origCreate;
+const exported = JSON.parse(globalThis.__lastBlob.parts[0]);
+ok(Array.isArray(exported) && exported.length === 2, '导出 JSON 含 2 条收藏');
+ok(lastA && lastA.download === 'sleep_station_favorites.json', '导出文件名与 APP 同名', lastA && lastA.download);
+ok(exported.every(x => x.isCustom === true && x.title && x.url), '导出条目为 RelaxItem 兼容形状（isCustom/title/url）');
+ok(exported.some(x => x.url === 'https://www.example.com/b/'), '导出保留原 URL 不改写');
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();
