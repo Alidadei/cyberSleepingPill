@@ -91,7 +91,7 @@ cyberSleepCommunity/
 - 品牌「电子安眠药」手写体；副标题=定位陈述「致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方」（副标题/meta description/og:description/README 四处同源，改一处同步四处）
 - 分享卡片 og:/canonical **静态写在 head**（微信/QQ/Telegram/百度抓卡片不执行 JS，动态注入等于没有；测试红线禁止回归 JS 注入）。og:image=assets/og-cover.jpg（1200×630 基线 JPEG）。实测：微信贴链接永远纯文本（平台行为，卡片只在内置浏览器菜单分享时生成）；飞书抓得到标题但抓不动 github.io 图片（平台限制，无解，治本=自有域名）
 - 收藏页 = `showRankingPage('favs')` 榜单页型态；同链接样例+社区并存时**社区条目优先去重**；池外收藏（APP 导入的站外内容）直接成卡；导出文件名/格式与 APP `RelaxDataIO` 完全一致（`sleep_station_favorites.json`，RelaxItem 数组，Gson 宽松兼容 → APP 导入零改动）
-- 链接失效：浏览器 CORS 探测不了外链 → 社区举报制（`link_reports` 表，(pick_id,uid) 一人一票，insert-only RLS）；≥2 个不同 uid → 卡片置灰+徽标；`tools/link-check.mjs` 每日 Actions 自动探测死链投 `bot-linkcheck` 一票（404/410/B站-404-403 才判死，反爬模糊态不判死）；表已建好并验证（2026-09-17）
+- 链接失效：浏览器 CORS 探测不了外链 → 社区举报制（`link_reports` 表，(pick_id,uid) 一人一票，insert-only RLS）；≥2 个不同 uid → 卡片置灰+徽标；点 ⚠ 弹「反馈链接失效」确认浮窗（说明机制、确认才上报、成功自动关闭，`openDeadDialog`）；`tools/link-check.mjs` 每日 Actions 自动探测死链投 `bot-linkcheck` 一票（404/410/B站-404-403 才判死，反爬模糊态不判死）；表已建好并验证（2026-09-17）
 - 评论功能（未实现，方案冻结）：Supabase comments 表 + RLS（可读可插不可改删）+ AdGuard 词表 + uid 冷却 + 站长手动审核；不进契约；等有日活再上
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 

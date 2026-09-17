@@ -470,6 +470,22 @@ sandbox.showRankingPage('noise');
 const freshCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
 ok(!!freshCard && !freshCard.classList.contains('stale') && freshCard.querySelectorAll('.dead-tag').length === 0, '仅 1 人举报不标记（防单点误报）');
 sandbox.deadReports = [];
+/* 确认浮窗：点击 ⚠ → 弹出说明浮窗 → 确认才上报 → 成功自动关闭；取消直接关 */
+sandbox.reportDeadLink = async () => 'ok';   /* 覆盖真实上报（Store 为 LocalStore），只验浮窗链路 */
+const dlgBack = sandbox.openDeadDialog('1720000000001');
+ok(bodyKids.includes(dlgBack) && dlgBack.textContent.includes('反馈链接失效') && dlgBack.textContent.includes('一人一票'), '点击 ⚠ 弹出「反馈链接失效」说明浮窗');
+const confirmBtn = [...dlgBack.querySelectorAll('button')].find(b => b.textContent === '确认反馈');
+confirmBtn.onclick();
+await sleep(20);
+ok(capturedDead && capturedDead.url.endsWith('/rest/v1/link_reports') && capturedDead.method === 'POST', '浮窗确认 → 上报 link_reports');
+ok(dlgBack.textContent.includes('已收到反馈'), '浮窗内显示成功反馈');
+await sleep(1000);
+ok(dlgBack._removed === true, '成功后浮窗自动关闭');
+const dlgBack2 = sandbox.openDeadDialog('1720000000001');
+const cancelBtn = [...dlgBack2.querySelectorAll('button')].find(b => b.textContent === '取消');
+cancelBtn.onclick();
+ok(dlgBack2._removed === true, '取消立即关闭浮窗且不上报');
+delete sandbox.reportDeadLink;
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();

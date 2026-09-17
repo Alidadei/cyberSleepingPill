@@ -485,6 +485,71 @@
       margin-left: 6px
     }
 
+    .dead-dlg-back {
+      position: fixed;
+      inset: 0;
+      background: rgb(var(--bg-rgb) / .55);
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px
+    }
+
+    .dead-dlg {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+      max-width: 340px;
+      width: 100%
+    }
+
+    .dead-dlg-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--ink)
+    }
+
+    .dead-dlg-body {
+      font-size: 13px;
+      color: var(--sub);
+      line-height: 1.6;
+      margin-bottom: 6px
+    }
+
+    .dead-dlg-msg {
+      min-height: 18px;
+      font-size: 13px;
+      margin-bottom: 6px
+    }
+
+    .dead-dlg-msg.ok {
+      color: var(--ok)
+    }
+
+    .dead-dlg-row {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end
+    }
+
+    .dead-dlg-btn {
+      border: 1px solid var(--line);
+      background: none;
+      color: var(--sub);
+      border-radius: 10px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px
+    }
+
+    .dead-dlg-btn.primary {
+      border-color: var(--bad);
+      color: var(--bad)
+    }
+
     .type {
       display: inline-block;
       font-size: 12px;
@@ -2009,6 +2074,55 @@
       if (!(Store && Store.reportDead)) return 'offline';   /* LocalStore（无云端）不提供举报 */
       try { await Store.reportDead(pickId); return 'ok'; } catch (e) { return 'fail'; }
     }
+    /* 举报确认浮窗：说明机制 → 确认才真正上报；成功后短暂停留自动关闭 */
+    function openDeadDialog(pickId, onDone) {
+      const back = document.createElement('div');
+      back.className = 'dead-dlg-back';
+      const dlg = document.createElement('div');
+      dlg.className = 'dead-dlg';
+      const h = document.createElement('div');
+      h.className = 'dead-dlg-title';
+      h.textContent = t('dead_dlg_title');
+      dlg.appendChild(h);
+      const p = document.createElement('div');
+      p.className = 'dead-dlg-body';
+      p.textContent = t('dead_dlg_body');
+      dlg.appendChild(p);
+      const msg = document.createElement('div');
+      msg.className = 'dead-dlg-msg';
+      dlg.appendChild(msg);
+      const row = document.createElement('div');
+      row.className = 'dead-dlg-row';
+      const okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.className = 'dead-dlg-btn primary';
+      okBtn.textContent = t('dead_dlg_confirm');
+      const noBtn = document.createElement('button');
+      noBtn.type = 'button';
+      noBtn.className = 'dead-dlg-btn';
+      noBtn.textContent = t('dead_dlg_cancel');
+      row.appendChild(okBtn);
+      row.appendChild(noBtn);
+      dlg.appendChild(row);
+      back.appendChild(dlg);
+      document.body.appendChild(back);
+      const close = () => back.remove();
+      noBtn.onclick = close;
+      back.onclick = e => { if (e.target === back) close(); };
+      okBtn.onclick = async () => {
+        okBtn.disabled = true;
+        const st = await reportDeadLink(pickId);
+        if (st === 'ok') {
+          msg.textContent = t('dead_reported');
+          msg.classList.add('ok');
+          setTimeout(() => { close(); if (onDone) onDone(); }, 900);
+        } else {
+          msg.textContent = t('dead_report_fail');
+          okBtn.disabled = false;
+        }
+      };
+      return back;
+    }
 
     /* ================= 渲染 ================= */
     let currentType = null;   /* null = 未点亮节点，榜单收起 */
@@ -2503,20 +2617,13 @@
         dead.title = dinfo.me ? t('dead_reported') : t('dead_report_tip');
         dead.setAttribute('aria-label', dead.title);
         dead.appendChild(warnSvg());
-        dead.onclick = async () => {
+        dead.onclick = () => {
           if (dead.classList.contains('done')) return;
-          dead.disabled = true;
-          const st = await reportDeadLink(pick.id);
-          if (st === 'ok') {
+          openDeadDialog(pick.id, () => {
             dead.classList.add('done');
             dead.title = t('dead_reported');
             dead.setAttribute('aria-label', dead.title);
-          } else if (st === 'fail') {
-            dead.title = t('dead_report_fail');
-            dead.setAttribute('aria-label', dead.title);
-            setTimeout(() => { dead.title = t('dead_report_tip'); }, 2500);
-          }
-          dead.disabled = false;
+          });
         };
         head.appendChild(dead);
       }
@@ -2755,6 +2862,7 @@
         favs_export: '导出收藏', favs_import: '导入收藏',
         favs_import_ok: (a, s) => `已导入 ${a} 条收藏${s ? ` · 跳过 ${s} 条重复/无效` : ''}`, favs_import_bad: '文件格式不对（需要收藏数组，可从 APP「睡眠站台」收藏页导出）',
         dead_report_tip: '链接打不开？报告失效', dead_reported: '已收到反馈（重复只计一次）', dead_report_fail: '上报失败，请稍后再试',
+        dead_dlg_title: '反馈链接失效', dead_dlg_body: '这条内容的链接打不开了？确认反馈记一票：同一内容累计 2 人以上报告，卡片会自动置灰提醒其他访客，站长定期清理。匿名提交，一人一票。', dead_dlg_confirm: '确认反馈', dead_dlg_cancel: '取消',
         dead_badge: '⚠ 多人报告：链接可能已失效',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
@@ -2821,6 +2929,7 @@
         favs_export: 'Export saved', favs_import: 'Import saved',
         favs_import_ok: (a, s) => `Imported ${a} saved item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`, favs_import_bad: 'Wrong format (expected a saved-items array, e.g. exported from the Sleep Station app)',
         dead_report_tip: 'Link dead? Report it', dead_reported: 'Feedback received (duplicates counted once)', dead_report_fail: 'Failed to report, try again later',
+        dead_dlg_title: 'Report a broken link', dead_dlg_body: 'Is this link dead? Confirm to cast one vote — once 2+ visitors report the same item, its card dims automatically to warn others. Anonymous, one vote per device.', dead_dlg_confirm: 'Confirm', dead_dlg_cancel: 'Cancel',
         dead_badge: '⚠ Several visitors: link may be dead',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
