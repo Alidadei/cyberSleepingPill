@@ -106,3 +106,4 @@ cyberSleepCommunity/
 7. **动作前探活**：本地预览服务器跨会话常被回收，curl 200 再用；IAB 内置浏览器 "webview not ready" 反复出现，直接切 headless Chrome/CDP，别耗在重试上。
 8. **测试断言挂了先加诊断输出再猜**（ok() 的 extra 参数会打印），本仓多次"灵异失败"最后都是状态没进预期分支。
 9. **外部服务的能力边界先查证再写方案**：GitHub Sponsors 大陆不可收款、飞书不渲染 github.io 预览图、浏览器探测不了跨域死活——都查证过，别在方案里复活这些死路。
+10. **git push 报 `SSL_ERROR_SYSCALL` 连不上 github.com**：本机网络对 HTTP/2 的间歇性干扰，用 `git -c http.version=HTTP/1.1 push origin main` 即可过（2026-09-17 实测）；纯重试往往连挂四次。
