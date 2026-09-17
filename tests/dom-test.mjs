@@ -459,19 +459,19 @@ await sandbox.SupabaseStore.reportDead('1720000000001');
 ok(capturedDead.url.endsWith('/rest/v1/link_reports') && capturedDead.method === 'POST', '举报 POST 到 link_reports 表');
 const deadBody = JSON.parse(capturedDead.body);
 ok(deadBody.pick_id === '1720000000001' && typeof deadBody.uid === 'string' && deadBody.uid.length > 0, '举报载荷含 pick_id + 匿名 uid');
-/* 徽标渲染规则（2026-09-17 收紧）：机器人判死 或 ≥3 台设备人工举报 才置灰；未验证的 1–2 票人工不标 */
-sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }];
-sandbox.showRankingPage('noise');
-const twoHumanCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
-ok(!!twoHumanCard && !twoHumanCard.classList.contains('stale') && twoHumanCard.querySelectorAll('.dead-tag').length === 0, '2 台设备人工举报且无验证 → 不置灰（防单人多设备误报）');
-sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }, { pick_id: 1720000000001, uid: 'userC' }];
-sandbox.showRankingPage('noise');
-const threeCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
-ok(!!threeCard && threeCard.classList.contains('stale') && threeCard.querySelectorAll('.dead-tag')[0].textContent.includes('多人报告'), '≥3 台设备人工举报 → 置灰 + 多人报告徽标');
+/* 徽标渲染规则（2026-09-17 站主定稿）：多人报告 AND 机器验证，缺一不可 */
 sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'bot-linkcheck' }, { pick_id: 1720000000001, uid: 'userA' }];
 sandbox.showRankingPage('noise');
-const botCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
-ok(!!botCard && botCard.classList.contains('stale') && botCard.querySelectorAll('.dead-tag')[0].textContent.includes('已验证'), '机器人判死 + 1 票人工 → 置灰 + 已验证徽标');
+const botOnlyCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+ok(!!botOnlyCard && !botOnlyCard.classList.contains('stale') && botOnlyCard.querySelectorAll('.dead-tag').length === 0, '仅机器人判死、无多人报告 → 不置灰');
+sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }, { pick_id: 1720000000001, uid: 'userC' }];
+sandbox.showRankingPage('noise');
+const humanOnlyCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+ok(!!humanOnlyCard && !humanOnlyCard.classList.contains('stale') && humanOnlyCard.querySelectorAll('.dead-tag').length === 0, '3 台设备人工举报但无机器验证 → 不置灰');
+sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'bot-linkcheck' }, { pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }];
+sandbox.showRankingPage('noise');
+const confirmedCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+ok(!!confirmedCard && confirmedCard.classList.contains('stale') && confirmedCard.querySelectorAll('.dead-tag')[0].textContent.includes('多人报告 + 机器验证'), '多人报告 + 机器验证 → 置灰 + 双确认徽标');
 sandbox.deadReports = [];
 /* 确认浮窗：点击 ⚠ → 弹出说明浮窗 → 确认才上报 → 成功自动关闭；取消直接关 */
 sandbox.reportDeadLink = async () => 'ok';   /* 覆盖真实上报（Store 为 LocalStore），只验浮窗链路 */

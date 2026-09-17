@@ -2061,7 +2061,7 @@
        不同 uid 举报 → 卡片置灰 + 「多人报告」徽标；清理由站长在云端 dashboard 完成。
        link_reports 是网站域数据，不进契约 §1。var/顶层函数供测试桩注入 */
     var deadReports = [];       /* [{pick_id, uid}] */
-    const DEAD_HUMAN_THRESHOLD = 3;   /* 无机器人验证时，纯人工举报需要的设备数 */
+    const DEAD_HUMAN_THRESHOLD = 2;   /* 「多人」= ≥2 台设备人工举报 */
     const BOT_UID = 'bot-linkcheck';  /* 与 tools/link-check.mjs 约定一致 */
     function deadInfo(pickId) {
       let human = 0, me = false, bot = false;
@@ -2072,8 +2072,8 @@
         human++;
         if (r.uid === u) me = true;
       }
-      /* 徽标需服务端验证背书：机器人判死，或 ≥3 台设备独立举报（防单人多设备误报） */
-      return { stale: bot || human >= DEAD_HUMAN_THRESHOLD, bot, human, me };
+      /* 报警双确认（站主定稿）：机器人判死 AND 多人举报，缺一不可 */
+      return { stale: bot && human >= DEAD_HUMAN_THRESHOLD, bot, human, me };
     }
     async function reportDeadLink(pickId) {
       if (!(Store && Store.reportDead)) return 'offline';   /* LocalStore（无云端）不提供举报 */
@@ -2659,7 +2659,7 @@
           el.classList.add('stale');
           const tag = document.createElement('span');
           tag.className = 'dead-tag';
-          tag.textContent = t(deadInfo(pick.id).bot ? 'dead_badge_bot' : 'dead_badge');
+          tag.textContent = t('dead_badge');
           m.appendChild(tag);
         }
       } else if (builtin && builtin.sampleRatingAvg != null) {
@@ -2868,7 +2868,7 @@
         favs_import_ok: (a, s) => `已导入 ${a} 条收藏${s ? ` · 跳过 ${s} 条重复/无效` : ''}`, favs_import_bad: '文件格式不对（需要收藏数组，可从 APP「睡眠站台」收藏页导出）',
         dead_report_tip: '链接打不开？报告失效', dead_reported: '已收到反馈（重复只计一次）', dead_report_fail: '上报失败，请稍后再试',
         dead_dlg_title: '反馈链接失效', dead_dlg_body: '这条内容的链接打不开了？确认反馈记一票：同一内容累计 2 人以上报告，卡片会自动置灰提醒其他访客，站长定期清理。匿名提交，一人一票。', dead_dlg_confirm: '确认反馈', dead_dlg_cancel: '取消',
-        dead_badge: '⚠ 多人报告：链接可能已失效', dead_badge_bot: '⚠ 已验证：链接可能已失效',
+        dead_badge: '⚠ 多人报告 + 机器验证：链接可能已失效',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
         form_title: '推荐任意让你犯困的小说、视频、播客…',
@@ -2935,7 +2935,7 @@
         favs_import_ok: (a, s) => `Imported ${a} saved item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`, favs_import_bad: 'Wrong format (expected a saved-items array, e.g. exported from the Sleep Station app)',
         dead_report_tip: 'Link dead? Report it', dead_reported: 'Feedback received (duplicates counted once)', dead_report_fail: 'Failed to report, try again later',
         dead_dlg_title: 'Report a broken link', dead_dlg_body: 'Is this link dead? Confirm to cast one vote — once 2+ visitors report the same item, its card dims automatically to warn others. Anonymous, one vote per device.', dead_dlg_confirm: 'Confirm', dead_dlg_cancel: 'Cancel',
-        dead_badge: '⚠ Several visitors: link may be dead', dead_badge_bot: '⚠ Verified: link may be dead',
+        dead_badge: '⚠ Multi-reported + machine-verified: link may be dead',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
         form_title: 'Recommend anything that lulls you to sleep — novels, videos, podcasts…',
