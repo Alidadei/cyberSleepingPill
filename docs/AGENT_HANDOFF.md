@@ -15,7 +15,7 @@
 ```bash
 # ① 语法：抽出内联 <script> 做语法检查
 awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html > /tmp/s.js && node --check /tmp/s.js
-# ② 行为回归：零依赖 DOM 桩测试（当前 132 项断言，全绿才算完；含 admin.html 红线扫描）
+# ② 行为回归：零依赖 DOM 桩测试（当前 133 项断言，全绿才算完；含 admin.html 红线扫描）
 node tests/dom-test.mjs
 # ③ 本地预览（后台常驻；跨会话可能被回收，用前先 curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8642/ 探活）
 python -m http.server 8642 --bind 127.0.0.1
@@ -29,6 +29,7 @@ python -m http.server 8642 --bind 127.0.0.1
 - 项目：`ttvaedbukdwpvdtmodeo.supabase.co`（Singapore 免费档）。anon key 是**公开凭据**（内嵌 index.html 顶部 `SUPABASE = {...}`），权限全靠 RLS；service_role 绝不进仓库/文档。
 - 表（均已建好）：`community_picks`（社区榜单）、`user_profiles`（匿名画像）、`link_reports`（链接失效举报，2026-09-17 上线）。
 - **Supabase CLI v2.117.0 已 npm 全局安装，但尚未 login**。用户自己跑一次 `supabase login`（浏览器授权）后，`supabase db query --linked -f any.sql` 可直连云端执行任意 SQL（管理面全打通，走 Management API 无需数据库密码）。MCP 配置存在但 access token 是占位符（`~/.zcode/cli/config.json`）——2026-09-19 实测 `list_projects` 返回 Unauthorized，仍等于没配，DDL 继续走「给站主粘贴 SQL → Dashboard 执行」流程。
+- **service_role（站长后台用）获取**：Dashboard → 项目 `ttvaedbukdwpvdtmodeo` → Settings → API Keys → **Secret keys** 新建一把复制（`sb_secret…` 开头；若 Legacy 区未禁用，`service_role` JWT 等效）。**能存放的地方只有两处**：admin.html 运行时内存（粘贴进密码框，刷新即丢）、被 `.gitignore` 忽略的本地文件（如 `service_role.local.txt`，模式 `service_role*` / `*.local.txt` / `*.secret` / `.env` 有测试断言保护）——绝不进仓库、聊天、截图、云盘。
 - Supabase 技能文档（`.agents/skills/supabase/SKILL.md`）有全部 REST curl 模板与红线。
 - GitHub Actions：`.github/workflows/link-check.yml` 每日 UTC 21:17 自动跑死链巡检（见 §2）；gh CLI 未登录，无法手动触发，改 workflow 定时/参数即可。
 
@@ -41,7 +42,7 @@ python -m http.server 8642 --bind 127.0.0.1
 cyberSleepCommunity/
 ├── index.html                  # 单文件站全部 HTML/CSS/JS（当前 ~3000 行）
 ├── admin.html                  # 站长后台：人工判活/判死/清举报/删条目（noindex，永不内嵌密钥）
-├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 132 项断言，含 admin 红线扫描）
+├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 133 项断言，含 admin 红线扫描）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
 ├── .github/workflows/link-check.yml
 ├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / 本文件
@@ -63,7 +64,7 @@ cyberSleepCommunity/
 5. 中文为主 UI；深浅主题跟时间走（`--t`），**不做手动亮暗开关**。
 6. 改完必跑 §1.1 三件套；改行为必补断言；**动过 HTML 结构/视觉必须在真实浏览器截图验收**（桩看不出结构损伤与排版，血泪教训见 §7）。
 7. 测试桩约定：测试用 `sed`/python 改过测试文件后，Edit 工具会报"file modified"——重新 Read 再 Edit。桩对 vm 沙盒的约定：顶层 `function`/`var` 声明会泄漏进沙盒全局（`sortPicks`、`refresh`、`deadReports` 可直接从测试触达），`const/let` 不会——需要测试注入的状态用 `var`（如 `deadReports`），其余用 `let/const`。
-8. **admin.html（站长后台）永不内嵌任何密钥**：service_role 只能运行时粘贴、仅存页面内存（刷新即丢）；页面公开可访问（robots Disallow + noindex、主站无入口链接），安全完全依赖密钥保密。数据渲染只许 textContent + http(s) 协议白名单（用户提交内容 = 不可信输入，防 XSS 偷内存里的密钥）；测试有红线扫描（JWT/sb_secret 字样、innerHTML、外链脚本），别"修复"掉。
+8. **admin.html（站长后台）永不内嵌任何密钥**：service_role 只能运行时粘贴、仅存页面内存（刷新即丢）；页面公开可访问（robots Disallow + noindex、主站无入口链接），安全完全依赖密钥保密。数据渲染只许 textContent + http(s) 协议白名单（用户提交内容 = 不可信输入，防 XSS 偷内存里的密钥）；测试有红线扫描（JWT/sb_secret 字样、innerHTML、外链脚本），别"修复"掉。密钥本地持久化的唯一允许形态 = `.gitignore` 忽略的文件（如 `service_role.local.txt`），获取步骤见 §1.3。
 
 ## 4. 未来任务（按优先级）
 
@@ -101,7 +102,7 @@ cyberSleepCommunity/
 
 ## 7. 开发经验与教训（每条都交过学费）
 
-1. **验证金字塔**：`node --check` → DOM 桩 132 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。
+1. **验证金字塔**：`node --check` → DOM 桩 133 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。
 2. **分享卡片类功能必须静态写 head**——一切"运行时注入元数据"的方案对不执行 JS 的爬虫无效。
 3. **存储结构升级别忘了写 key**：收藏从 urlKey 字符串升级为对象时，第一版漏存 `key` 字段，读回全被丢弃——schema 变更后立刻跑真实链路测试，别只看"没报错"。
 4. **bash heredoc 反引号会吞字**：写含反引号/`$` 的内容用 `<<'EOF'`（带引号）或 python；`sed -i` 改文件后 Edit 工具会拒绝（文件状态过期），重新 Read 即可。

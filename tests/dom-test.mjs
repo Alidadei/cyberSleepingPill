@@ -571,5 +571,7 @@ let compiled = true;
 try { new Function(adminJs); } catch (e) { compiled = e.message; }
 ok(compiled === true, 'admin.html 脚本语法编译通过（不执行）', compiled);
 ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), 'admin.html 覆盖 判定列 + 举报/条目清理操作');
+const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
+ok(gitignore.includes('service_role') && gitignore.includes('.env'), '.gitignore 忽略密钥文件（service_role*/.env，防手滑提交）');
 
 console.log('\nALL PASS: ' + pass + ' assertions');

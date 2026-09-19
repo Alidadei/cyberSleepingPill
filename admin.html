@@ -79,6 +79,7 @@
   <p>报警规则：站长判死，或（无判定时）机器人判死 AND ≥2 台设备举报；站长判活永久压过一切举报与机器人投票。</p>
   <p>巡检机器人（tools/link-check.mjs）会跳过已人工判定的条目。删除不可恢复，顺序为先清举报再删条目。</p>
   <p>判活/判死报「列不存在」= DDL 未执行：去 Supabase Dashboard → SQL Editor 粘贴 docs/supabase-schema.sql 尾部「v1.4 站长后台」升级 SQL。</p>
+  <p>service_role 获取：Supabase Dashboard → 你的项目 → Settings → API Keys → Secret keys 新建一把复制（若 Legacy 区可用，service_role JWT 等效）。只贴进上方密码框——只存本页内存，别处一律不放。</p>
 </footer>
 
 <script>

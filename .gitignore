@@ -1,0 +1,5 @@
+# 密钥与本地私有文件——绝不提交（AGENT_HANDOFF §3.8 仓库铁律；dom-test 断言保护以下模式）
+service_role*
+*.local.txt
+*.secret
+.env
