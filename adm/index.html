@@ -15,14 +15,13 @@
          font: 14px/1.6 'Segoe UI', system-ui, -apple-system, 'Noto Sans SC', sans-serif; }
   h1 { font-size: 20px; margin: 0 0 4px; color: #8d6e63; }
   .sub { margin: 0 0 14px; color: #8c7b6a; font-size: 12.5px; }
-  .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
   input, select, button { font: inherit; background: #ffffff; color: #3e3228; border: 1px solid #ddd4c8; border-radius: 8px; padding: 6px 10px; }
   #keyInput { flex: 1; min-width: 240px; }
   button { cursor: pointer; }
   button:hover { border-color: #8d6e63; color: #8d6e63; }
   #keyBtn { background: #8d6e63; border-color: #8d6e63; color: #ffffff; }
   #keyBtn:hover { color: #ffffff; background: #7a5f55; }
-  .warn { color: #b07d4f; font-size: 12px; margin: 6px 0 16px; }
   .tools-nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
   .tools-nav a { font: inherit; font-size: 13px; font-weight: 700; background: #ffffff; color: #8d6e63; border: 1px solid #ddd4c8;
                  border-radius: 8px; padding: 5px 12px; text-decoration: none; }
@@ -67,10 +66,9 @@
 
 <section class="keybox">
   <span id="modeChip" class="chip readonly">匿名只读</span>
-  <input id="keyInput" type="password" placeholder="粘贴 service_role 密钥以进入管理（只读浏览无需密钥）" autocomplete="off">
+  <input id="keyInput" type="password" placeholder="粘贴 service_role 密钥（只读浏览无需密钥）。密钥只保存在本页内存里：不写入源码、不写入本地存储、刷新或关闭即丢弃。判定 / 清理 / 删除操作必须先进入管理。" autocomplete="off">
   <button id="keyBtn" type="button">进入管理</button>
 </section>
-<p class="warn">密钥只保存在本页内存里：不写入源码、不写入本地存储、刷新或关闭即丢弃。判定 / 清理 / 删除操作必须先进入管理。</p>
 
 <section class="bar">
   <select id="filter">
