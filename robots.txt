@@ -1,6 +1,6 @@
 User-agent: *
 Allow: /
-Disallow: /admin.html
-Disallow: /stats.html
+Disallow: /adm
+Disallow: /data
 
 Sitemap: https://alidadei.github.io/cyberSleepingPill/sitemap.xml

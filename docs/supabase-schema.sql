@@ -67,7 +67,7 @@ create policy "anon insert report" on public.link_reports
   for insert to anon with check (true);
 
 -- ============================================================
--- v1.4 站长后台（2026-09-19，网站域数据，不进契约 §1）：admin.html 人工判定
+-- v1.4 站长后台（2026-09-19，网站域数据，不进契约 §1）：/adm 人工判定
 --   admin_verdict      'alive' 人工判活（永久压过一切举报与机器人投票，永不报警）
 --                      | 'dead'  人工判死（直接报警，无需双确认）
 --                      | NULL    走自动双确认：机器人判死 AND ≥2 台设备举报

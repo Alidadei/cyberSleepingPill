@@ -15,7 +15,7 @@
 ```bash
 # ① 语法：抽出内联 <script> 做语法检查
 awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html > /tmp/s.js && node --check /tmp/s.js
-# ② 行为回归：零依赖 DOM 桩测试（当前 141 项断言，全绿才算完；含 admin.html 红线扫描）
+# ② 行为回归：零依赖 DOM 桩测试（当前 141 项断言，全绿才算完；含 /adm 红线扫描）
 node tests/dom-test.mjs
 # ③ 本地预览（后台常驻；跨会话可能被回收，用前先 curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8642/ 探活）
 python -m http.server 8642 --bind 127.0.0.1
@@ -29,7 +29,7 @@ python -m http.server 8642 --bind 127.0.0.1
 - 项目：`ttvaedbukdwpvdtmodeo.supabase.co`（Singapore 免费档）。anon key 是**公开凭据**（内嵌 index.html 顶部 `SUPABASE = {...}`），权限全靠 RLS；service_role 绝不进仓库/文档。
 - 表（均已建好）：`community_picks`（社区榜单）、`user_profiles`（匿名画像）、`link_reports`（链接失效举报，2026-09-17 上线）。
 - **Supabase CLI v2.117.0 已 npm 全局安装，但尚未 login**。用户自己跑一次 `supabase login`（浏览器授权）后，`supabase db query --linked -f any.sql` 可直连云端执行任意 SQL（管理面全打通，走 Management API 无需数据库密码）。MCP 配置存在但 access token 是占位符（`~/.zcode/cli/config.json`）——2026-09-19 实测 `list_projects` 返回 Unauthorized，仍等于没配，DDL 继续走「给站主粘贴 SQL → Dashboard 执行」流程。
-- **service_role（站长后台用）获取**：Dashboard → 项目 `ttvaedbukdwpvdtmodeo` → Settings → API Keys → **Secret keys** 新建一把复制（`sb_secret…` 开头；若 Legacy 区未禁用，`service_role` JWT 等效）。**能存放的地方只有两处**：admin.html 运行时内存（粘贴进密码框，刷新即丢）、被 `.gitignore` 忽略的本地文件（如 `service_role.local.txt`，模式 `service_role*` / `*.local.txt` / `*.secret` / `.env` 有测试断言保护）——绝不进仓库、聊天、截图、云盘。
+- **service_role（站长后台用）获取**：Dashboard → 项目 `ttvaedbukdwpvdtmodeo` → Settings → API Keys → **Secret keys** 新建一把复制（`sb_secret…` 开头；若 Legacy 区未禁用，`service_role` JWT 等效）。**能存放的地方只有两处**：/adm 运行时内存（粘贴进密码框，刷新即丢）、被 `.gitignore` 忽略的本地文件（如 `service_role.local.txt`，模式 `service_role*` / `*.local.txt` / `*.secret` / `.env` 有测试断言保护）——绝不进仓库、聊天、截图、云盘。
 - Supabase 技能文档（`.agents/skills/supabase/SKILL.md`）有全部 REST curl 模板与红线。
 - GitHub Actions：`.github/workflows/link-check.yml` 每日 UTC 21:17 自动跑死链巡检（见 §2）；gh CLI 未登录，无法手动触发，改 workflow 定时/参数即可。
 
@@ -41,8 +41,8 @@ python -m http.server 8642 --bind 127.0.0.1
 ```
 cyberSleepCommunity/
 ├── index.html                  # 单文件站全部 HTML/CSS/JS（当前 ~3000 行）
-├── admin.html                  # 站长后台：人工判活/判死/清举报/删条目（noindex，永不内嵌密钥）
-├── stats.html                  # 数据页：画像/推荐/链接健康统计，密钥门禁 + 30 秒自刷（noindex）
+├── adm/index.html              # 站长后台：人工判活/判死/清举报/删条目（noindex，永不内嵌密钥）
+├── data/index.html             # 数据页：画像/推荐/链接健康统计，密钥门禁 + 30 秒自刷（noindex）
 ├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 141 项断言，含 admin 红线扫描）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
 ├── .github/workflows/link-check.yml
@@ -52,7 +52,7 @@ cyberSleepCommunity/
 └── README.md
 ```
 
-**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 stats.html（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单。**云端三表 live**（community_picks / user_profiles / link_reports），`admin_verdict` 列待站主执行 v1.4 DDL 后生效；云端现有数据极少（个位数条目）。
+**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 /data（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单。**云端三表 live**（community_picks / user_profiles / link_reports），`admin_verdict` 列待站主执行 v1.4 DDL 后生效；云端现有数据极少（个位数条目）。
 
 **有意下线的东西（不要恢复）**：导航栏 导出/导入（社区数据以云端为唯一通道，顺带堵掉了绕过 AdGuard 的批量导入口子）；网站介绍按钮（注释保留）；emoji 图标（仅历史品牌位）。
 
@@ -65,11 +65,11 @@ cyberSleepCommunity/
 5. 中文为主 UI；深浅主题跟时间走（`--t`），**不做手动亮暗开关**。
 6. 改完必跑 §1.1 三件套；改行为必补断言；**动过 HTML 结构/视觉必须在真实浏览器截图验收**（桩看不出结构损伤与排版，血泪教训见 §7）。
 7. 测试桩约定：测试用 `sed`/python 改过测试文件后，Edit 工具会报"file modified"——重新 Read 再 Edit。桩对 vm 沙盒的约定：顶层 `function`/`var` 声明会泄漏进沙盒全局（`sortPicks`、`refresh`、`deadReports` 可直接从测试触达），`const/let` 不会——需要测试注入的状态用 `var`（如 `deadReports`），其余用 `let/const`。
-8. **admin.html（站长后台）永不内嵌任何密钥**：service_role 只能运行时粘贴、仅存页面内存（刷新即丢）；页面公开可访问（robots Disallow + noindex、主站无入口链接），安全完全依赖密钥保密。数据渲染只许 textContent + http(s) 协议白名单（用户提交内容 = 不可信输入，防 XSS 偷内存里的密钥）；测试有红线扫描（JWT/sb_secret 字样、innerHTML、外链脚本），别"修复"掉。密钥本地持久化的唯一允许形态 = `.gitignore` 忽略的文件（如 `service_role.local.txt`），获取步骤见 §1.3。
+8. **/adm（站长后台）永不内嵌任何密钥**：service_role 只能运行时粘贴、仅存页面内存（刷新即丢）；页面公开可访问（robots Disallow + noindex、主站无入口链接），安全完全依赖密钥保密。数据渲染只许 textContent + http(s) 协议白名单（用户提交内容 = 不可信输入，防 XSS 偷内存里的密钥）；测试有红线扫描（JWT/sb_secret 字样、innerHTML、外链脚本），别"修复"掉。密钥本地持久化的唯一允许形态 = `.gitignore` 忽略的文件（如 `service_role.local.txt`），获取步骤见 §1.3。
 
 ## 4. 未来任务（按优先级）
 
-0. **待站主执行（阻塞后台判定功能，页面已上线）**：Dashboard → SQL Editor 粘贴 `docs/supabase-schema.sql` 尾部「v1.4 站长后台」整段（幂等，可重复跑）。DDL 前后台可看可刷新，判活/判死会报「列不存在」（admin.html 已内置引导提示）；主站 select=* 天然兼容，不受影响。
+0. **待站主执行（阻塞后台判定功能，页面已上线）**：Dashboard → SQL Editor 粘贴 `docs/supabase-schema.sql` 尾部「v1.4 站长后台」整段（幂等，可重复跑）。DDL 前后台可看可刷新，判活/判死会报「列不存在」（/adm 已内置引导提示）；主站 select=* 天然兼容，不受影响。
 1. **APP 端云端同步（P1 收尾）**：`RelaxStore.kt` 是预留换源点，需写 `RemoteStore.kt`（HttpURLConnection 调同一 REST）+「社区云同步」开关。网站端已就绪。
 2. **内容量冷启动**：站内真实条目仍是个位数，目标 30–50 条（收录眼光是站主的活，agent 可协助批量抓取/整理候选）。
 3. **评论功能**：站主已拍板"要做但等有日活"。方案已备（见 §6 评论条目），落地即建 `comments` 表 + AdGuard 词表过滤 + 冷却 + 站主手动审核。
@@ -97,8 +97,8 @@ cyberSleepCommunity/
 - 分享卡片 og:/canonical **静态写在 head**（微信/QQ/Telegram/百度抓卡片不执行 JS，动态注入等于没有；测试红线禁止回归 JS 注入）。og:image=assets/og-cover.jpg（1200×630 基线 JPEG）。实测：微信贴链接永远纯文本（平台行为，卡片只在内置浏览器菜单分享时生成）；飞书抓得到标题但抓不动 github.io 图片（平台限制，无解，治本=自有域名）
 - 收藏页 = `showRankingPage('favs')` 榜单页型态；同链接样例+社区并存时**社区条目优先去重**；池外收藏（APP 导入的站外内容）直接成卡；导出文件名/格式与 APP `RelaxDataIO` 完全一致（`sleep_station_favorites.json`，RelaxItem 数组，Gson 宽松兼容 → APP 导入零改动）
 - 链接失效：浏览器 CORS 探测不了外链 → 社区举报制（`link_reports` 表，(pick_id,uid) 一人一票，insert-only RLS）；置灰报警为**双确认**（2026-09-17 站主定稿，缺一不可，起因=站主两台设备自测误触发）：机器人 `bot-linkcheck` 每日探测判死 **AND** ≥2 台设备人工举报（`DEAD_HUMAN_THRESHOLD=2`）→ 「⚠ 多人报告 + 机器验证：链接可能已失效」徽标；点 ⚠ 弹「反馈链接失效」确认浮窗（说明机制、确认才上报、成功自动关闭，`openDeadDialog`）；`tools/link-check.mjs` 每日 Actions 自动探测死链投 `bot-linkcheck` 一票（404/410/B站-404-403 才判死，反爬模糊态不判死）；表已建好并验证（2026-09-17）
-- **站长后台 admin.html（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制。顶部常驻导航（数据页入口 + 返回主站）。**配色 = 暖白简化调色板**（站主指定采用 `/research-html` 色板：奶油底 #faf8f5 + 暖棕 #8d6e63，红 #b05050 仅危险语义），有意区别于主站深色星空，别"统一"回去
-- **数据页 stats.html（2026-09-19）**：密钥门禁（同 admin.html，service_role 运行时粘贴仅内存，进入前不渲染任何数据）；顶部常驻导航（站长后台入口 + 返回主站）；总览/用户画像/推荐内容/链接健康四区，进入后每 30 秒自动刷新；纯客户端聚合（三表全量拉取 limit 2000/5000，规模大后应改 PostgREST 聚合或视图）；画像标签映射与站内 `AGE_GROUP_KEYS/GENDER_KEYS/EDU_KEYS` 一致（未知值原样显示）；报警口径与主站三层规则同源（含 admin_verdict）；配色同 admin.html 暖白简化；noindex + robots Disallow + 主站无入口
+- **站长后台 /adm（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制。顶部常驻导航（数据页入口 + 返回主站）。**配色 = 暖白简化调色板**（站主指定采用 `/research-html` 色板：奶油底 #faf8f5 + 暖棕 #8d6e63，红 #b05050 仅危险语义），有意区别于主站深色星空，别"统一"回去
+- **数据页 /data（2026-09-19）**：密钥门禁（同 /adm，service_role 运行时粘贴仅内存，进入前不渲染任何数据）；顶部常驻导航（站长后台入口 + 返回主站）；总览/用户画像/推荐内容/链接健康四区，进入后每 30 秒自动刷新；纯客户端聚合（三表全量拉取 limit 2000/5000，规模大后应改 PostgREST 聚合或视图）；画像标签映射与站内 `AGE_GROUP_KEYS/GENDER_KEYS/EDU_KEYS` 一致（未知值原样显示）；报警口径与主站三层规则同源（含 admin_verdict）；配色同 /adm 暖白简化；noindex + robots Disallow + 主站无入口
 - 评论功能（未实现，方案冻结）：Supabase comments 表 + RLS（可读可插不可改删）+ AdGuard 词表 + uid 冷却 + 站长手动审核；不进契约；等有日活再上
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 

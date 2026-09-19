@@ -89,7 +89,7 @@ P1 完成后 P0 的 localStorage 数据用「导入 JSON」按钮一次性迁移
 > APP 端 `RemoteStore.kt` 尚未动工，换源点见 §6 上文。
 
 > 网站域扩展（2026-09-19，不升 §1 契约，与 link_reports 同例）：`community_picks` 表新增
-> 站长人工判定列 `admin_verdict`（'alive'/'dead'/NULL，站长后台 admin.html 专用）与
+> 站长人工判定列 `admin_verdict`（'alive'/'dead'/NULL，站长后台 /adm 专用）与
 > `admin_verified_at`（审计时间）。同时 anon 授权收缩为**列级**：update 仅放开
 > ratings/recommend_count（网站打分与重复提交合并正好只用这两列），insert 不含判定列——
 > 判定只有 service_role 能写，防止匿名把死链改判活。APP 端 Gson 对未知字段自动忽略。

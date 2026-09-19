@@ -558,33 +558,33 @@ g('fUrl').value = 'not a url at all';
 await g('fSubmit').onclick();
 ok(g('fMsg').textContent === '链接无效，请检查', '无效链接文案');
 
-/* ---------- 16. 站长后台 admin.html（公开可访问，但永不内嵌密钥） ---------- */
-const adminHtml = readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
-ok(adminHtml.includes('noindex'), 'admin.html 带 noindex（不进搜索引擎）');
-ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(adminHtml), 'admin.html 无内嵌 JWT（service_role 只能运行时粘贴）');
-ok(!adminHtml.includes('sb_secret_'), 'admin.html 无 sb_secret_ 密钥');
-ok(adminHtml.includes('sb_publishable_'), 'admin.html 仅内嵌公开 anon key（与 index.html 同源）');
-ok(!adminHtml.includes('innerHTML'), 'admin.html 不用 innerHTML（用户提交内容仅 textContent 渲染，防 XSS 偷密钥）');
-ok(!/<script[^>]*src=/.test(adminHtml), 'admin.html 零依赖（无外链脚本）');
+/* ---------- 16. 站长后台 /adm（公开可访问，但永不内嵌密钥） ---------- */
+const adminHtml = readFileSync(new URL('../adm/index.html', import.meta.url), 'utf8');
+ok(adminHtml.includes('noindex'), '/adm 带 noindex（不进搜索引擎）');
+ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(adminHtml), '/adm 无内嵌 JWT（service_role 只能运行时粘贴）');
+ok(!adminHtml.includes('sb_secret_'), '/adm 无 sb_secret_ 密钥');
+ok(adminHtml.includes('sb_publishable_'), '/adm 仅内嵌公开 anon key（与 index.html 同源）');
+ok(!adminHtml.includes('innerHTML'), '/adm 不用 innerHTML（用户提交内容仅 textContent 渲染，防 XSS 偷密钥）');
+ok(!/<script[^>]*src=/.test(adminHtml), '/adm 零依赖（无外链脚本）');
 const adminJs = adminHtml.match(/<script>([\s\S]*?)<\/script>/)[1];
 let compiled = true;
 try { new Function(adminJs); } catch (e) { compiled = e.message; }
-ok(compiled === true, 'admin.html 脚本语法编译通过（不执行）', compiled);
-ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), 'admin.html 覆盖 判定列 + 举报/条目清理操作');
-ok(adminHtml.includes('href="stats.html"') && adminHtml.includes('href="index.html"'), 'admin.html 常驻导航：数据页入口 + 返回主站');
+ok(compiled === true, '/adm 脚本语法编译通过（不执行）', compiled);
+ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), '/adm 覆盖 判定列 + 举报/条目清理操作');
+ok(adminHtml.includes('href="../data/"') && adminHtml.includes('href="../"'), '/adm 常驻导航：数据页入口 + 返回主站');
 const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
 ok(gitignore.includes('service_role') && gitignore.includes('.env'), '.gitignore 忽略密钥文件（service_role*/.env，防手滑提交）');
-/* ---------- 16b. 数据页 stats.html（密钥门禁；同套红线扫描） ---------- */
-const statsHtml = readFileSync(new URL('../stats.html', import.meta.url), 'utf8');
-ok(statsHtml.includes('noindex'), 'stats.html 带 noindex（不进搜索引擎）');
-ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(statsHtml), 'stats.html 无内嵌 JWT（service_role 只能运行时粘贴）');
-ok(!statsHtml.includes('sb_secret_'), 'stats.html 无 sb_secret_ 密钥');
-ok(!statsHtml.includes('innerHTML'), 'stats.html 不用 innerHTML');
-ok(!/<script[^>]*src=/.test(statsHtml), 'stats.html 零依赖（无外链脚本）');
+/* ---------- 16b. 数据页 /data（密钥门禁；同套红线扫描） ---------- */
+const statsHtml = readFileSync(new URL('../data/index.html', import.meta.url), 'utf8');
+ok(statsHtml.includes('noindex'), '/data 带 noindex（不进搜索引擎）');
+ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(statsHtml), '/data 无内嵌 JWT（service_role 只能运行时粘贴）');
+ok(!statsHtml.includes('sb_secret_'), '/data 无 sb_secret_ 密钥');
+ok(!statsHtml.includes('innerHTML'), '/data 不用 innerHTML');
+ok(!/<script[^>]*src=/.test(statsHtml), '/data 零依赖（无外链脚本）');
 const statsJs = statsHtml.match(/<script>([\s\S]*?)<\/script>/)[1];
 let statsCompiled = true;
 try { new Function(statsJs); } catch (e) { statsCompiled = e.message; }
-ok(statsCompiled === true, 'stats.html 脚本语法编译通过（不执行）', statsCompiled);
-ok(statsHtml.includes('href="admin.html"') && statsHtml.includes('href="index.html"'), 'stats.html 常驻导航：站长后台入口 + 返回主站');
+ok(statsCompiled === true, '/data 脚本语法编译通过（不执行）', statsCompiled);
+ok(statsHtml.includes('href="../adm/"') && statsHtml.includes('href="../"'), '/data 常驻导航：站长后台入口 + 返回主站');
 
 console.log('\nALL PASS: ' + pass + ' assertions');

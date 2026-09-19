@@ -7,7 +7,7 @@
 <meta name="referrer" content="no-referrer">
 <title>数据页 · 电子安眠药</title>
 <style>
-  /* 配色 = /research-html 暖白简化调色板（与 admin.html 同源）：奶油底 + 暖棕主色，
+  /* 配色 = /research-html 暖白简化调色板（与 /adm 同源）：奶油底 + 暖棕主色，
      红 #b05050 仅危险/报警语义；绿=画像/正向，蓝=机器人/中性，琥珀=人工/警示 */
   :root { color-scheme: light; }
   * { box-sizing: border-box; }
@@ -67,8 +67,8 @@
 </header>
 
 <nav class="tools-nav">
-  <a href="admin.html" rel="noopener">站长后台 →</a>
-  <a href="index.html">← 返回主站</a>
+  <a href="../adm/" rel="noopener">站长后台 →</a>
+  <a href="../">← 返回主站</a>
 </nav>
 
 <section id="lock">
@@ -76,7 +76,7 @@
     <input id="keyInput" type="password" placeholder="粘贴 service_role 密钥进入（本页不展示任何无权限数据）" autocomplete="off">
     <button id="keyBtn" type="button">进入</button>
   </section>
-  <p class="warn">密钥只保存在本页内存：不写入源码、不写入本地存储、刷新或关闭即丢弃。获取方式见 admin.html 页脚。</p>
+  <p class="warn">密钥只保存在本页内存：不写入源码、不写入本地存储、刷新或关闭即丢弃。获取方式见 /adm 页脚。</p>
 </section>
 
 <section id="dash" hidden>
@@ -114,7 +114,7 @@
    tests/dom-test.mjs 扫描本文件确保没有内嵌任何保密密钥。 */
 var SUPA = 'https://ttvaedbukdwpvdtmodeo.supabase.co';
 var BOT = 'bot-linkcheck';
-var HUMAN_ALARM = 2;              /* 与 index.html / admin.html 一致 */
+var HUMAN_ALARM = 2;              /* 与 index.html / /adm 一致 */
 var REFRESH_MS = 30000;
 var key = '';
 var timer = null;
@@ -355,7 +355,7 @@ function leave() {
 
 $('keyBtn').onclick = async () => {
   var k = $('keyInput').value.trim();
-  if (!k) { note('请先粘贴 service_role 密钥（获取方式见 admin.html 页脚）', true); return; }
+  if (!k) { note('请先粘贴 service_role 密钥（获取方式见 /adm 页脚）', true); return; }
   key = k;
   try {
     await api('community_picks?id=eq.0&select=id');   /* 试一把：验证密钥有效 */
