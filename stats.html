@@ -17,6 +17,10 @@
   h2 { font-size: 15px; margin: 22px 0 8px; color: #8d6e63; border-bottom: 1px solid #ddd4c8; padding-bottom: 4px; }
   h3 { font-size: 13px; margin: 12px 0 6px; color: #6d5a4a; }
   .sub { margin: 0 0 14px; color: #8c7b6a; font-size: 12.5px; }
+  .tools-nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+  .tools-nav a { font: inherit; font-size: 13px; background: #ffffff; color: #8d6e63; border: 1px solid #ddd4c8;
+                 border-radius: 8px; padding: 5px 12px; text-decoration: none; }
+  .tools-nav a:hover { border-color: #8d6e63; background: #f3efe9; }
   .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   input, button { font: inherit; background: #ffffff; color: #3e3228; border: 1px solid #ddd4c8; border-radius: 8px; padding: 6px 10px; }
   #keyInput { flex: 1; min-width: 240px; }
@@ -59,8 +63,13 @@
 <body>
 <header>
   <h1>电子安眠药 · 数据页</h1>
-  <p class="sub">用户画像 + 推荐内容 + 链接健康 匿名数据汇总，进入后每 30 秒自动刷新。管理操作请去 admin.html。</p>
+  <p class="sub">用户画像 + 推荐内容 + 链接健康 匿名数据汇总，进入后每 30 秒自动刷新。</p>
 </header>
+
+<nav class="tools-nav">
+  <a href="admin.html" rel="noopener">站长后台 →</a>
+  <a href="index.html">← 返回主站</a>
+</nav>
 
 <section id="lock">
   <section class="keybox">

@@ -584,5 +584,6 @@ const statsJs = statsHtml.match(/<script>([\s\S]*?)<\/script>/)[1];
 let statsCompiled = true;
 try { new Function(statsJs); } catch (e) { statsCompiled = e.message; }
 ok(statsCompiled === true, 'stats.html 脚本语法编译通过（不执行）', statsCompiled);
+ok(statsHtml.includes('href="admin.html"') && statsHtml.includes('href="index.html"'), 'stats.html 常驻导航：站长后台入口 + 返回主站');
 
 console.log('\nALL PASS: ' + pass + ' assertions');
