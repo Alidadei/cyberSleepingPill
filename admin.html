@@ -23,6 +23,10 @@
   #keyBtn { background: #8d6e63; border-color: #8d6e63; color: #ffffff; }
   #keyBtn:hover { color: #ffffff; background: #7a5f55; }
   .warn { color: #b07d4f; font-size: 12px; margin: 6px 0 16px; }
+  .tools-nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+  .tools-nav a { font: inherit; font-size: 13px; background: #ffffff; color: #8d6e63; border: 1px solid #ddd4c8;
+                 border-radius: 8px; padding: 5px 12px; text-decoration: none; }
+  .tools-nav a:hover { border-color: #8d6e63; background: #f3efe9; }
   .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid #c4b49e; margin-left: 6px; white-space: nowrap; }
   .chip.readonly { color: #a89885; border-color: #ddd4c8; }
   .chip.admin { color: #6d9b7a; border-color: #6d9b7a; background: #edf3ef; }
@@ -55,6 +59,11 @@
   <h1>电子安眠药 · 站长后台</h1>
   <p class="sub">人工核实链接 → 判活 / 判死（凌驾于自动报警）；删除漏网广告条目。数据直达 Supabase。</p>
 </header>
+
+<nav class="tools-nav">
+  <a href="stats.html" rel="noopener">数据页 →</a>
+  <a href="index.html">← 返回主站</a>
+</nav>
 
 <section class="keybox">
   <span id="modeChip" class="chip readonly">匿名只读</span>
