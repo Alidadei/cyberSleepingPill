@@ -573,5 +573,16 @@ ok(compiled === true, 'admin.html 脚本语法编译通过（不执行）', comp
 ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), 'admin.html 覆盖 判定列 + 举报/条目清理操作');
 const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
 ok(gitignore.includes('service_role') && gitignore.includes('.env'), '.gitignore 忽略密钥文件（service_role*/.env，防手滑提交）');
+/* ---------- 16b. 数据页 stats.html（密钥门禁；同套红线扫描） ---------- */
+const statsHtml = readFileSync(new URL('../stats.html', import.meta.url), 'utf8');
+ok(statsHtml.includes('noindex'), 'stats.html 带 noindex（不进搜索引擎）');
+ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(statsHtml), 'stats.html 无内嵌 JWT（service_role 只能运行时粘贴）');
+ok(!statsHtml.includes('sb_secret_'), 'stats.html 无 sb_secret_ 密钥');
+ok(!statsHtml.includes('innerHTML'), 'stats.html 不用 innerHTML');
+ok(!/<script[^>]*src=/.test(statsHtml), 'stats.html 零依赖（无外链脚本）');
+const statsJs = statsHtml.match(/<script>([\s\S]*?)<\/script>/)[1];
+let statsCompiled = true;
+try { new Function(statsJs); } catch (e) { statsCompiled = e.message; }
+ok(statsCompiled === true, 'stats.html 脚本语法编译通过（不执行）', statsCompiled);
 
 console.log('\nALL PASS: ' + pass + ' assertions');

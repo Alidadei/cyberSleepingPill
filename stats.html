@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>数据页 · 电子安眠药</title>
+<style>
+  /* 配色 = /research-html 暖白简化调色板（与 admin.html 同源）：奶油底 + 暖棕主色，
+     红 #b05050 仅危险/报警语义；绿=画像/正向，蓝=机器人/中性，琥珀=人工/警示 */
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; padding: 18px 16px 30px; max-width: 1080px; background: #faf8f5; color: #3e3228;
+         font: 14px/1.6 'Segoe UI', system-ui, -apple-system, 'Noto Sans SC', sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #8d6e63; }
+  h2 { font-size: 15px; margin: 22px 0 8px; color: #8d6e63; border-bottom: 1px solid #ddd4c8; padding-bottom: 4px; }
+  h3 { font-size: 13px; margin: 12px 0 6px; color: #6d5a4a; }
+  .sub { margin: 0 0 14px; color: #8c7b6a; font-size: 12.5px; }
+  .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, button { font: inherit; background: #ffffff; color: #3e3228; border: 1px solid #ddd4c8; border-radius: 8px; padding: 6px 10px; }
+  #keyInput { flex: 1; min-width: 240px; }
+  button { cursor: pointer; }
+  button:hover { border-color: #8d6e63; color: #8d6e63; }
+  #keyBtn, #goBtn { background: #8d6e63; border-color: #8d6e63; color: #ffffff; }
+  #keyBtn:hover, #goBtn:hover { color: #ffffff; background: #7a5f55; }
+  .warn { color: #b07d4f; font-size: 12px; margin: 6px 0 16px; }
+  .topline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: #8c7b6a; font-size: 12.5px; margin-bottom: 4px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat { background: #ffffff; border: 1px solid #ddd4c8; border-radius: 12px; padding: 10px 14px; }
+  .stat b { display: block; font-size: 22px; color: #8d6e63; line-height: 1.3; }
+  .stat span { color: #8c7b6a; font-size: 12px; }
+  .stat.alert b { color: #b05050; }
+  .stat.good b { color: #6d9b7a; }
+  .dist { background: #ffffff; border: 1px solid #ddd4c8; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+  .brow { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+  .brow .lbl { flex: 0 0 88px; color: #3e3228; font-size: 12.5px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .brow .bar { flex: 1; height: 14px; background: #f3efe9; border-radius: 99px; overflow: hidden; }
+  .brow .fill { height: 100%; border-radius: 99px; }
+  .brow .num { flex: 0 0 72px; color: #8c7b6a; font-size: 12px; }
+  .b1 { background: #8d6e63; } .b2 { background: #b07d4f; } .b3 { background: #7a9ec4; }
+  .b4 { background: #6d9b7a; } .b5 { background: #c99a6b; }
+  .list { background: #ffffff; border: 1px solid #ddd4c8; border-radius: 12px; padding: 6px 14px; margin-bottom: 10px; }
+  .list .li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed #eee7dc; font-size: 13px; }
+  .list .li:last-child { border-bottom: none; }
+  .list .rank { color: #c99a6b; font-weight: 700; flex: 0 0 18px; }
+  .list .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list .v { color: #8d6e63; font-weight: 600; white-space: nowrap; }
+  .list .v.bad { color: #b05050; }
+  .msg { min-height: 20px; font-size: 13px; margin: 10px 0 0; }
+  .msg.bad { color: #b05050; }
+  .empty { color: #a89885; font-size: 12.5px; background: #ffffff; border: 1px dashed #ddd4c8; border-radius: 12px; padding: 10px 14px; }
+  footer { color: #a89885; font-size: 12px; border-top: 1px solid #ddd4c8; margin-top: 22px; padding-top: 10px; }
+  footer p { margin: 2px 0; }
+  footer a { color: #a1887f; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>电子安眠药 · 数据页</h1>
+  <p class="sub">用户画像 + 推荐内容 + 链接健康 匿名数据汇总，进入后每 30 秒自动刷新。管理操作请去 admin.html。</p>
+</header>
+
+<section id="lock">
+  <section class="keybox">
+    <input id="keyInput" type="password" placeholder="粘贴 service_role 密钥进入（本页不展示任何无权限数据）" autocomplete="off">
+    <button id="keyBtn" type="button">进入</button>
+  </section>
+  <p class="warn">密钥只保存在本页内存：不写入源码、不写入本地存储、刷新或关闭即丢弃。获取方式见 admin.html 页脚。</p>
+</section>
+
+<section id="dash" hidden>
+  <div class="topline">
+    <span id="updated">最后更新：—</span>
+    <span>· 每 30 秒自动刷新</span>
+    <button id="goBtn" type="button">立即刷新</button>
+    <button id="outBtn" type="button">退出</button>
+  </div>
+
+  <h2>总览</h2>
+  <div class="cards" id="ovCards"></div>
+
+  <h2>用户画像</h2>
+  <div id="profileWrap"><p class="empty">加载中…</p></div>
+
+  <h2>推荐内容</h2>
+  <div id="pickWrap"><p class="empty">加载中…</p></div>
+
+  <h2>链接健康</h2>
+  <div id="linkWrap"><p class="empty">加载中…</p></div>
+</section>
+
+<p id="msg" class="msg"></p>
+
+<footer>
+  <p>报警口径与主站一致：站长判死，或（无判定时）机器人判死 AND ≥2 台设备举报；站长判活不计入报警。</p>
+  <p>画像/推荐均为匿名统计数据；本页只读，无任何写操作。规模变大后应改为 PostgREST 聚合或视图。</p>
+</footer>
+
+<script>
+'use strict';
+/* 数据页：零依赖单文件。公开凭据只有项目 URL + anon key（与 index.html 一致）；
+   service_role 只能运行时粘贴进内存（key 变量），绝不写进本文件——
+   tests/dom-test.mjs 扫描本文件确保没有内嵌任何保密密钥。 */
+var SUPA = 'https://ttvaedbukdwpvdtmodeo.supabase.co';
+var BOT = 'bot-linkcheck';
+var HUMAN_ALARM = 2;              /* 与 index.html / admin.html 一致 */
+var REFRESH_MS = 30000;
+var key = '';
+var timer = null;
+
+/* 标签映射：与 index.html AGE_GROUP_KEYS / GENDER_KEYS / EDU_KEYS 一致，未知值原样显示 */
+var AGE = { '60s': '60后', '70s': '70后', '80s': '80后', '90s': '90后', '00s': '00后', prefer_not: '保密' };
+var GENDER = { male: '男', female: '女', prefer_not: '保密' };
+var EDU = { bachelor: '本科', master: '硕士', phd: '博士', other: '其他', prefer_not: '保密' };
+var TYPE = { anxiety: '焦虑型', excitement: '兴奋型', physical: '生理型', noise: '噪音干扰型' };
+
+function $(id) { return document.getElementById(id); }
+function note(s, bad) { var m = $('msg'); m.textContent = s; m.className = 'msg' + (bad ? ' bad' : ''); }
+
+async function api(path) {
+  var r = await fetch(SUPA + '/rest/v1/' + path, {
+    headers: { apikey: key, Authorization: 'Bearer ' + key }
+  });
+  if (!r.ok) {
+    var detail = '';
+    try { var j = await r.json(); detail = (j.message || '') + (j.code ? ' (' + j.code + ')' : ''); } catch (e) { /* 非 JSON 错误体 */ }
+    throw new Error('HTTP ' + r.status + (detail ? ' · ' + detail : ''));
+  }
+  return r.json();
+}
+
+function countBy(rows, field, map, missing) {
+  var miss = missing || 'prefer_not';
+  var out = {};
+  for (var i = 0; i < rows.length; i++) {
+    var raw = rows[i][field] == null || rows[i][field] === '' ? miss : String(rows[i][field]);
+    var label = (map && map[raw]) || raw;
+    out[label] = (out[label] || 0) + 1;
+  }
+  return out;
+}
+function pct(n, total) { return total ? Math.round(n / total * 1000) / 10 + '%' : '—'; }
+
+function statCard(label, value, cls) {
+  var d = document.createElement('div');
+  d.className = 'stat' + (cls ? ' ' + cls : '');
+  var b = document.createElement('b');
+  b.textContent = value;
+  var s = document.createElement('span');
+  s.textContent = label;
+  d.appendChild(b); d.appendChild(s);
+  return d;
+}
+function distBlock(title, obj, color) {
+  var box = document.createElement('div');
+  box.className = 'dist';
+  var h = document.createElement('h3');
+  h.textContent = title + '（共 ' + Object.keys(obj).reduce(function (a, k) { return a + obj[k]; }, 0) + '）';
+  box.appendChild(h);
+  var keys = Object.keys(obj).sort(function (a, b) { return obj[b] - obj[a]; });
+  var max = keys.length ? obj[keys[0]] : 1;
+  keys.forEach(function (k) {
+    var row = document.createElement('div');
+    row.className = 'brow';
+    var lbl = document.createElement('span'); lbl.className = 'lbl'; lbl.textContent = k;
+    var bar = document.createElement('span'); bar.className = 'bar';
+    var fill = document.createElement('span'); fill.className = 'fill ' + color;
+    fill.style.width = Math.max(3, Math.round(obj[k] / max * 100)) + '%';
+    bar.appendChild(fill);
+    var num = document.createElement('span'); num.className = 'num';
+    num.textContent = obj[k] + ' · ' + pct(obj[k], keys.reduce(function (a, x) { return a + obj[x]; }, 0));
+    lbl.textContent = k;
+    row.appendChild(lbl); row.appendChild(bar); row.appendChild(num);
+    box.appendChild(row);
+  });
+  return box;
+}
+function listBlock(title, items) {
+  var box = document.createElement('div');
+  box.className = 'list';
+  var h = document.createElement('h3');
+  h.textContent = title;
+  box.appendChild(h);
+  if (!items.length) {
+    var e = document.createElement('div');
+    e.className = 'li';
+    e.textContent = '暂无数据';
+    box.appendChild(e);
+    return box;
+  }
+  items.forEach(function (it, i) {
+    var li = document.createElement('div');
+    li.className = 'li';
+    var rank = document.createElement('span'); rank.className = 'rank'; rank.textContent = i + 1;
+    var t = document.createElement('span'); t.className = 't'; t.textContent = it.t;
+    var v = document.createElement('span'); v.className = 'v' + (it.bad ? ' bad' : ''); v.textContent = it.v;
+    li.appendChild(rank); li.appendChild(t); li.appendChild(v);
+    box.appendChild(li);
+  });
+  return box;
+}
+function dayStr(msOrIso) {
+  if (!msOrIso) return '';
+  if (typeof msOrIso === 'number') return new Date(msOrIso).toISOString().slice(0, 10);
+  return String(msOrIso).slice(0, 10);
+}
+function daysAgoIso(n) { return new Date(Date.now() - n * 86400000).toISOString(); }
+
+function alarmOf(pick, bot, human) {
+  var v = pick.admin_verdict || null;
+  if (v === 'dead') return true;
+  if (v === 'alive') return false;
+  return bot && human >= HUMAN_ALARM;
+}
+
+async function refreshAll() {
+  note('');
+  var picks, profiles, reports;
+  try {
+    var all = await Promise.all([
+      api('community_picks?select=*&limit=2000'),
+      api('user_profiles?select=*&limit=5000'),
+      api('link_reports?select=*&limit=5000')
+    ]);
+    picks = all[0] || []; profiles = all[1] || []; reports = all[2] || [];
+  } catch (e) {
+    note('加载失败：' + e.message + (/40[123]/.test(e.message) ? ' —— 密钥无效' : ''), true);
+    return;
+  }
+
+  /* ---- 举报聚合（先于总览） ---- */
+  var repByPick = {};
+  var humanTotal = 0, botTotal = 0, latestRep = '';
+  reports.forEach(function (r) {
+    var k = String(r.pick_id);
+    if (!repByPick[k]) repByPick[k] = { human: {}, bot: false };
+    if (r.uid === BOT) { botTotal++; repByPick[k].bot = true; }
+    else { humanTotal++; repByPick[k].human[r.uid] = 1; }
+    if (r.created_at && String(r.created_at) > latestRep) latestRep = String(r.created_at);
+  });
+  var alarms = picks.filter(function (p) {
+    var st = repByPick[String(p.id)];
+    if (!st) return (p.admin_verdict === 'dead');
+    return alarmOf(p, st.bot, Object.keys(st.human).length);
+  });
+
+  /* ---- 总览 ---- */
+  var totalRatings = 0, ratingSum = 0;
+  picks.forEach(function (p) {
+    (p.ratings || []).forEach(function (x) { ratingSum += x; totalRatings++; });
+  });
+  var globalAvg = totalRatings ? (ratingSum / totalRatings).toFixed(1) : '—';
+  var now7 = daysAgoIso(7), now30 = daysAgoIso(30);
+  var new7 = picks.filter(function (p) { return p.addedAt >= 0 && new Date(p.addedAt).toISOString() >= now7; }).length;
+  var new30 = picks.filter(function (p) { return p.addedAt >= 0 && new Date(p.addedAt).toISOString() >= now30; }).length;
+  var ov = $('ovCards');
+  ov.textContent = '';
+  ov.appendChild(statCard('推荐条目', picks.length));
+  ov.appendChild(statCard('总评分次数', totalRatings));
+  ov.appendChild(statCard('全站平均分', globalAvg, 'good'));
+  ov.appendChild(statCard('画像份数', profiles.length));
+  ov.appendChild(statCard('举报总数', reports.length, 'alert'));
+  ov.appendChild(statCard('报警中条目', alarms.length, 'alert'));
+  ov.appendChild(statCard('7 天新增', new7, new7 ? 'good' : ''));
+  ov.appendChild(statCard('30 天新增', new30));
+
+  /* ---- 用户画像 ---- */
+  var pw = $('profileWrap');
+  pw.textContent = '';
+  if (!profiles.length) {
+    var pe = document.createElement('p'); pe.className = 'empty'; pe.textContent = '暂无画像数据（访客在榜单页「完善画像」提交后这里会出现）';
+    pw.appendChild(pe);
+  } else {
+    var nick = profiles.filter(function (p) { return p.nickname && String(p.nickname).trim(); }).length;
+    var pc = document.createElement('div'); pc.className = 'cards';
+    pc.appendChild(statCard('填写昵称', nick + ' · ' + pct(nick, profiles.length)));
+    var withAge = profiles.filter(function (p) { return p.age_group && p.age_group !== 'prefer_not'; }).length;
+    pc.appendChild(statCard('填写年龄段', withAge + ' · ' + pct(withAge, profiles.length)));
+    var withG = profiles.filter(function (p) { return p.gender && p.gender !== 'prefer_not'; }).length;
+    pc.appendChild(statCard('填写性别', withG + ' · ' + pct(withG, profiles.length)));
+    var withE = profiles.filter(function (p) { return p.education && p.education !== 'prefer_not'; }).length;
+    pc.appendChild(statCard('填写学历', withE + ' · ' + pct(withE, profiles.length)));
+    pw.appendChild(pc);
+    pw.appendChild(distBlock('年龄段分布', countBy(profiles, 'age_group', AGE), 'b4'));
+    pw.appendChild(distBlock('性别分布', countBy(profiles, 'gender', GENDER), 'b1'));
+    pw.appendChild(distBlock('学历分布', countBy(profiles, 'education', EDU), 'b3'));
+  }
+
+  /* ---- 推荐内容 ---- */
+  var kw = $('pickWrap');
+  kw.textContent = '';
+  kw.appendChild(distBlock('类型分布', countBy(picks, 'type', TYPE, '未分类'), 'b2'));
+  var rated = picks.filter(function (p) { return p.ratings && p.ratings.length; }).map(function (p) {
+    var avg = p.ratings.reduce(function (a, b) { return a + b; }, 0) / p.ratings.length;
+    return { t: p.title || '(无标题)', v: '★ ' + avg.toFixed(1) + ' · ' + p.ratings.length + ' 人' };
+  }).sort(function (a, b) { return parseFloat(b.v.slice(2)) - parseFloat(a.v.slice(2)); }).slice(0, 5);
+  kw.appendChild(listBlock('评分最高 TOP5', rated));
+  var recd = picks.filter(function (p) { return (p.recommend_count || 1) >= 2; }).map(function (p) {
+    return { t: p.title || '(无标题)', v: '被推荐 ' + (p.recommend_count || 1) + ' 次' };
+  }).sort(function (a, b) { return parseInt(b.v, 10) - parseInt(a.v, 10); }).slice(0, 5);
+  kw.appendChild(listBlock('被推荐次数 TOP5', recd));
+  var newest = picks.slice().sort(function (a, b) { return (b.addedAt || 0) - (a.addedAt || 0); }).slice(0, 5).map(function (p) {
+    return { t: p.title || '(无标题)', v: dayStr(p.addedAt) };
+  });
+  kw.appendChild(listBlock('最新提交 5 条', newest));
+
+  /* ---- 链接健康 ---- */
+  var lw = $('linkWrap');
+  lw.textContent = '';
+  var lc = document.createElement('div'); lc.className = 'cards';
+  var involved = Object.keys(repByPick).length;
+  lc.appendChild(statCard('真人举报票', humanTotal, 'alert'));
+  lc.appendChild(statCard('机器人判死票', botTotal));
+  lc.appendChild(statCard('被举报条目', involved));
+  lc.appendChild(statCard('报警中', alarms.length, 'alert'));
+  var c = document.createElement('div'); c.className = 'cards';
+  lc.appendChild(statCard('最近举报', latestRep ? dayStr(latestRep) : '—'));
+  lw.appendChild(lc);
+  lw.appendChild(listBlock('当前报警条目', alarms.map(function (p) {
+    var st = repByPick[String(p.id)] || { bot: false, human: {} };
+    var h = Object.keys(st.human).length;
+    var why = (p.admin_verdict === 'dead') ? '站长判死' : (h + ' 人' + (st.bot ? ' + 机器人' : ''));
+    return { t: p.title || '(无标题)', v: '⚠ ' + why, bad: true };
+  })));
+
+  $('updated').textContent = '最后更新：' + new Date().toTimeString().slice(0, 8);
+}
+
+function enter() {
+  $('lock').hidden = true;
+  $('dash').hidden = false;
+  if (timer) clearInterval(timer);
+  refreshAll();
+  timer = setInterval(refreshAll, REFRESH_MS);
+}
+function leave() {
+  key = '';
+  if (timer) { clearInterval(timer); timer = null; }
+  $('keyInput').value = '';
+  $('lock').hidden = false;
+  $('dash').hidden = true;
+  note('已退出（密钥已从内存丢弃）');
+}
+
+$('keyBtn').onclick = async () => {
+  var k = $('keyInput').value.trim();
+  if (!k) { note('请先粘贴 service_role 密钥（获取方式见 admin.html 页脚）', true); return; }
+  key = k;
+  try {
+    await api('community_picks?id=eq.0&select=id');   /* 试一把：验证密钥有效 */
+    $('keyInput').value = '';
+    note('✓ 已进入（密钥仅存本页内存，刷新即失效）');
+    enter();
+  } catch (e) {
+    key = '';
+    note('密钥无效：' + e.message, true);
+  }
+};
+$('goBtn').onclick = () => refreshAll();
+$('outBtn').onclick = leave;
+</script>
+</body>
+</html>
