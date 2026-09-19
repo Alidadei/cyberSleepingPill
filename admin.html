@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>站长后台 · 电子安眠药</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0 auto; padding: 18px 16px 30px; max-width: 1080px; background: #0f1220; color: #d8d4e2;
+         font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #c9aed1; }
+  .sub { margin: 0 0 14px; color: #8f89a3; font-size: 12.5px; }
+  .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, select, button { font: inherit; background: #1a1e33; color: #d8d4e2; border: 1px solid #343a58; border-radius: 8px; padding: 6px 10px; }
+  #keyInput { flex: 1; min-width: 240px; }
+  button { cursor: pointer; }
+  button:hover { border-color: #b89bbf; }
+  .warn { color: #a08ca8; font-size: 12px; margin: 6px 0 16px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid #4a4f6e; margin-left: 6px; white-space: nowrap; }
+  .chip.readonly { color: #8f89a3; }
+  .chip.admin { color: #9ee2b8; border-color: #4f8a63; }
+  .chip.alarm { color: #ff9e9e; border-color: #a05050; }
+  .chip.vdead { color: #ff9e9e; border-color: #a05050; background: #3a2029; }
+  .chip.valive { color: #9ee2b8; border-color: #4f8a63; background: #1d3128; }
+  .chip.bot { color: #ffc48a; border-color: #a07a45; }
+  .chip.human { color: #ffe08a; border-color: #a08f45; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { color: #8f89a3; font-size: 12.5px; margin: 8px 0; }
+  .row { background: #171b2e; border: 1px solid #262c47; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .row.alarm { border-color: #7a4040; }
+  .row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  a.title { color: #e6dff0; font-weight: 600; text-decoration: none; }
+  a.title:hover { color: #c9aed1; }
+  .row-url { color: #7d7793; font-size: 12px; word-break: break-all; margin: 2px 0; }
+  .row-url a { color: #8f9bd0; text-decoration: none; }
+  .row-meta { color: #8f89a3; font-size: 12px; margin: 4px 0 8px; }
+  .row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .row-btns button { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
+  .danger { border-color: #7a4040; color: #ff9e9e; }
+  .msg { min-height: 20px; font-size: 13px; margin: 10px 0 0; }
+  .msg.bad { color: #ff9e9e; }
+  footer { color: #6f6a85; font-size: 12px; border-top: 1px solid #262c47; margin-top: 18px; padding-top: 10px; }
+  footer p { margin: 2px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>电子安眠药 · 站长后台</h1>
+  <p class="sub">人工核实链接 → 判活 / 判死（凌驾于自动报警）；删除漏网广告条目。数据直达 Supabase。</p>
+</header>
+
+<section class="keybox">
+  <span id="modeChip" class="chip readonly">匿名只读</span>
+  <input id="keyInput" type="password" placeholder="粘贴 service_role 密钥以进入管理（只读浏览无需密钥）" autocomplete="off">
+  <button id="keyBtn" type="button">进入管理</button>
+</section>
+<p class="warn">密钥只保存在本页内存里：不写入源码、不写入本地存储、刷新或关闭即丢弃。判定 / 清理 / 删除操作必须先进入管理。</p>
+
+<section class="bar">
+  <select id="filter">
+    <option value="all">全部条目</option>
+    <option value="alarm">⚠ 报警中</option>
+    <option value="bot">机器人判死</option>
+    <option value="human">有人举报</option>
+    <option value="decided">站长已判定</option>
+    <option value="new">最新 20 条（广告过目）</option>
+  </select>
+  <input id="q" type="search" placeholder="搜标题 / URL / 域名">
+  <button id="reload" type="button">刷新</button>
+</section>
+<p id="stat" class="stat">加载中…</p>
+<div id="rows"></div>
+<p id="msg" class="msg"></p>
+
+<footer>
+  <p>报警规则：站长判死，或（无判定时）机器人判死 AND ≥2 台设备举报；站长判活永久压过一切举报与机器人投票。</p>
+  <p>巡检机器人（tools/link-check.mjs）会跳过已人工判定的条目。删除不可恢复，顺序为先清举报再删条目。</p>
+  <p>判活/判死报「列不存在」= DDL 未执行：去 Supabase Dashboard → SQL Editor 粘贴 docs/supabase-schema.sql 尾部「v1.4 站长后台」升级 SQL。</p>
+</footer>
+
+<script>
+'use strict';
+/* 站长后台：零依赖单文件。只有两处公开凭据（与 index.html 一致）：项目 URL + anon key。
+   service_role 密钥只能运行时粘贴进内存（state.key），绝不写进本文件——这是仓库铁律，
+   tests/dom-test.mjs 会扫描本文件确保没有内嵌任何保密密钥。 */
+var SUPA = 'https://ttvaedbukdwpvdtmodeo.supabase.co';
+var ANON = 'sb_publishable_buDoQC3OdWau8DdtUY9moQ_YbK5UgSm';
+var BOT = 'bot-linkcheck';          /* 与 tools/link-check.mjs 约定一致 */
+var HUMAN_ALARM = 2;                /* 与 index.html DEAD_HUMAN_THRESHOLD 一致 */
+var state = { key: '', picks: [], reports: [] };
+
+function $(id) { return document.getElementById(id); }
+
+function hdrs(admin, json) {
+  var h = { apikey: admin ? state.key : ANON };
+  if (admin) h['Authorization'] = 'Bearer ' + state.key;
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+async function api(method, path, body, useAdmin) {
+  var r = await fetch(SUPA + '/rest/v1/' + path, {
+    method: method,
+    headers: hdrs(useAdmin, body !== undefined),
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  if (!r.ok) {
+    var detail = '';
+    try { var j = await r.json(); detail = (j.message || '') + (j.code ? ' (' + j.code + ')' : ''); } catch (e) { /* 非 JSON 错误体 */ }
+    throw new Error('HTTP ' + r.status + (detail ? ' · ' + detail : ''));
+  }
+  return r.status === 204 ? null : r.json();
+}
+
+function note(s, bad) { var m = $('msg'); m.textContent = s; m.className = 'msg' + (bad ? ' bad' : ''); }
+function fail(e) {
+  var s = '操作失败：' + e.message;
+  if (/42703|does not exist/i.test(e.message)) s += ' —— admin_verdict 列不存在，请先执行 docs/supabase-schema.sql 尾部「v1.4 站长后台」升级 SQL';
+  else if (/40[123]/.test(e.message)) s += ' —— 密钥无效或尚未进入管理';
+  note(s, true);
+}
+function guard() {
+  if (!state.key) { note('请先粘贴 service_role 密钥并点「进入管理」', true); return false; }
+  return true;
+}
+
+async function load() {
+  $('stat').textContent = '加载中…';
+  try {
+    var both = await Promise.all([
+      api('GET', 'community_picks?select=*&order=addedAt.desc&limit=1000', undefined, false),
+      api('GET', 'link_reports?select=pick_id,uid&limit=5000', undefined, false)
+    ]);
+    state.picks = both[0] || [];
+    state.reports = both[1] || [];
+    note('');
+  } catch (e) {
+    $('stat').textContent = '云端加载失败：' + e.message;
+    return;
+  }
+  render();
+}
+
+function repStats(pickId) {
+  var seen = {}, human = 0, bot = false;
+  for (var i = 0; i < state.reports.length; i++) {
+    var r = state.reports[i];
+    if (String(r.pick_id) !== String(pickId)) continue;
+    if (r.uid === BOT) { bot = true; continue; }
+    if (!seen[r.uid]) { seen[r.uid] = 1; human++; }
+  }
+  return { bot: bot, human: human };
+}
+function verdictOf(p) { return p.admin_verdict || null; }
+function alarmOf(p, st) {
+  var v = verdictOf(p);
+  if (v === 'dead') return true;
+  if (v === 'alive') return false;
+  return st.bot && st.human >= HUMAN_ALARM;
+}
+function fmtDay(ms) {
+  var n = Number(ms);
+  return n > 0 ? new Date(n).toISOString().slice(0, 10) : '?';
+}
+
+function render() {
+  var fv = $('filter').value, q = $('q').value.trim().toLowerCase();
+  var list = state.picks.slice();
+  var nAlarm = 0, nBot = 0, nHuman = 0, nDecided = 0;
+  list.forEach(function (p) {
+    var st = repStats(p.id), v = verdictOf(p);
+    if (alarmOf(p, st)) nAlarm++;
+    if (st.bot) nBot++;
+    if (st.human > 0) nHuman++;
+    if (v) nDecided++;
+    p._st = st; p._v = v; p._alarm = alarmOf(p, st);
+  });
+  if (fv === 'alarm') list = list.filter(p => p._alarm);
+  else if (fv === 'bot') list = list.filter(p => p._st.bot);
+  else if (fv === 'human') list = list.filter(p => p._st.human > 0);
+  else if (fv === 'decided') list = list.filter(p => p._v);
+  else if (fv === 'new') list = list.slice(0, 20);
+  if (q) list = list.filter(p => ((p.title || '') + ' ' + (p.url || '')).toLowerCase().indexOf(q) !== -1);
+
+  $('stat').textContent = '共 ' + state.picks.length + ' 条 · ⚠ 报警 ' + nAlarm + ' · 机器判死 ' + nBot +
+    ' · 有人举报 ' + nHuman + ' · 站长已判定 ' + nDecided + (state.key ? ' · 管理员' : ' · 匿名只读');
+
+  var box = $('rows');
+  box.textContent = '';
+  if (!list.length) { box.appendChild(makeEmpty()); return; }
+  list.forEach(function (p) { box.appendChild(makeRow(p)); });
+}
+function makeEmpty() {
+  var d = document.createElement('p');
+  d.className = 'stat';
+  d.textContent = '（此筛选下没有条目）';
+  return d;
+}
+
+function makeRow(p) {
+  var safeHref = /^https?:\/\//i.test(p.url || '');
+  var row = document.createElement('div');
+  row.className = 'row' + (p._alarm ? ' alarm' : '');
+
+  var head = document.createElement('div');
+  head.className = 'row-head';
+  if (safeHref) {
+    var a = document.createElement('a');
+    a.className = 'title';
+    a.href = p.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = p.title || '(无标题)';
+    head.appendChild(a);
+  } else {
+    var st2 = document.createElement('span');
+    st2.className = 'title';
+    st2.textContent = (p.title || '(无标题)') + '　〔URL 非 http(s)，可疑〕';
+    head.appendChild(st2);
+  }
+  if (p.type) {
+    var tc = document.createElement('span');
+    tc.className = 'chip';
+    tc.textContent = '# ' + p.type;
+    head.appendChild(tc);
+  }
+  if (p._v === 'dead') pushChip(head, '站长判死', 'vdead');
+  else if (p._v === 'alive') pushChip(head, '站长判活', 'valive');
+  if (p._alarm && p._v !== 'dead') pushChip(head, '⚠ 报警中', 'alarm');
+  if (p._st.bot) pushChip(head, '机器人判死', 'bot');
+  if (p._st.human > 0) pushChip(head, p._st.human + ' 人举报', 'human');
+  row.appendChild(head);
+
+  var urlLine = document.createElement('div');
+  urlLine.className = 'row-url';
+  if (safeHref) {
+    var ua = document.createElement('a');
+    ua.href = p.url; ua.target = '_blank'; ua.rel = 'noopener noreferrer';
+    ua.textContent = p.url;
+    urlLine.appendChild(ua);
+  } else {
+    urlLine.textContent = p.url;
+  }
+  row.appendChild(urlLine);
+
+  var avg = p.ratings && p.ratings.length
+    ? (p.ratings.reduce(function (x, y) { return x + y; }, 0) / p.ratings.length).toFixed(1) + '★(' + p.ratings.length + '人)' : '无评分';
+  var meta = document.createElement('div');
+  meta.className = 'row-meta';
+  meta.textContent = avg + ' · 推荐×' + (p.recommend_count || 1) + ' · 提交于 ' + fmtDay(p.addedAt) +
+    ' · 举报：' + (p._st.human ? p._st.human + ' 人' : '无') + (p._st.bot ? ' + 机器人' : '') +
+    (p.admin_verified_at ? ' · 判定时间 ' + String(p.admin_verified_at).slice(0, 10) : '');
+  row.appendChild(meta);
+
+  var btns = document.createElement('div');
+  btns.className = 'row-btns';
+  if (safeHref) {
+    var open = document.createElement('button');
+    open.type = 'button'; open.textContent = '打开核实';
+    open.onclick = () => window.open(p.url, '_blank', 'noopener');
+    btns.appendChild(open);
+  }
+  btns.appendChild(makeBtn('判活 ✓', () => setVerdict(p, 'alive')));
+  btns.appendChild(makeBtn('判死 ✕', () => setVerdict(p, 'dead')));
+  if (p._v) btns.appendChild(makeBtn('清除判定', () => setVerdict(p, null)));
+  if (p._st.bot || p._st.human > 0) btns.appendChild(makeBtn('清除举报', () => clearReports(p)));
+  var del = document.createElement('button');
+  del.type = 'button'; del.className = 'danger'; del.textContent = '删除条目';
+  del.onclick = () => delPick(p);
+  btns.appendChild(del);
+  row.appendChild(btns);
+  return row;
+}
+function pushChip(head, text, cls) {
+  var c = document.createElement('span');
+  c.className = 'chip ' + cls;
+  c.textContent = text;
+  head.appendChild(c);
+}
+function makeBtn(text, fn) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = text;
+  b.onclick = fn;
+  return b;
+}
+
+async function setVerdict(p, v) {
+  if (!guard()) return;
+  var body = v === null ? { admin_verdict: null, admin_verified_at: null }
+    : { admin_verdict: v, admin_verified_at: new Date().toISOString() };
+  try {
+    await api('PATCH', 'community_picks?id=eq.' + p.id, body, true);
+    note('✓ 已' + (v === 'alive' ? '判活' : v === 'dead' ? '判死' : '清除判定') + '：' + (p.title || p.id));
+    load();
+  } catch (e) { fail(e); }
+}
+async function clearReports(p) {
+  if (!guard()) return;
+  try {
+    await api('DELETE', 'link_reports?pick_id=eq.' + p.id, undefined, true);
+    note('✓ 已清除该条全部举报：' + (p.title || p.id));
+    load();
+  } catch (e) { fail(e); }
+}
+async function delPick(p) {
+  if (!guard()) return;
+  if (!confirm('确定删除「' + (p.title || p.id) + '」？\n' + (p.url || '') + '\n\n删除不可恢复（先清举报，再删条目）。')) return;
+  try {
+    await api('DELETE', 'link_reports?pick_id=eq.' + p.id, undefined, true);
+    await api('DELETE', 'community_picks?id=eq.' + p.id, undefined, true);
+    note('✓ 已删除：' + (p.title || p.id));
+    load();
+  } catch (e) { fail(e); }
+}
+
+/* ---- 密钥进出（仅内存） ---- */
+function setChip() {
+  var c = $('modeChip');
+  c.textContent = state.key ? '管理员' : '匿名只读';
+  c.className = 'chip ' + (state.key ? 'admin' : 'readonly');
+  $('keyBtn').textContent = state.key ? '退出管理' : '进入管理';
+}
+$('keyBtn').onclick = async () => {
+  if (state.key) {
+    state.key = '';
+    $('keyInput').value = '';
+    setChip();
+    note('已退出管理（密钥已从内存丢弃）');
+    render();
+    return;
+  }
+  var k = $('keyInput').value.trim();
+  if (!k) { note('请先粘贴 service_role 密钥（Supabase Dashboard → Settings → API，保密那一把）', true); return; }
+  state.key = k;
+  try {
+    await api('GET', 'community_picks?id=eq.0&select=id', undefined, true);   /* 试一把：验证密钥有效 */
+    $('keyInput').value = '';
+    setChip();
+    note('✓ 已进入管理（密钥仅存本页内存，刷新即失效）');
+    render();
+  } catch (e) {
+    state.key = '';
+    fail(e);
+  }
+};
+
+$('reload').onclick = () => load();
+$('filter').onchange = () => render();
+$('q').oninput = () => render();
+
+setChip();
+load();
+</script>
+</body>
+</html>

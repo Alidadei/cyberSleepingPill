@@ -78,9 +78,13 @@ async function probe(url) {
 }
 
 /* ---- 主流程 ---- */
-const picks = await jfetch('community_picks?select=id,title,url&limit=1000');
+/* select=*：兼容 admin_verdict 列存在与否（站长后台人工判定的条目跳过自动投票） */
+const picks = await jfetch('community_picks?select=*&limit=1000');
 if (!Array.isArray(picks)) throw new Error('picks 加载失败');
-console.log(`共 ${picks.length} 条云端推荐待检`);
+const decided = picks.filter(p => p.admin_verdict);          /* 站长已判活/判死 → 人工裁决优先，不投机器人票 */
+const pending = picks.filter(p => !p.admin_verdict);
+if (decided.length) console.log(`站长已人工判定 ${decided.length} 条（跳过自动探测）：` + decided.map(p => `#${p.id}`).join(' '));
+console.log(`共 ${pending.length} 条云端推荐待检`);
 
 /* link_reports 表未创建（404）时按「无举报」降级，只做探测 */
 async function safeList(path) {
@@ -92,8 +96,8 @@ const humanCount = {};
 for (const r of humans) if (r.uid !== BOT_UID) humanCount[r.pick_id] = (humanCount[r.pick_id] || 0) + 1;
 
 const results = [];
-for (let i = 0; i < picks.length; i += CONCURRENCY) {
-  const wave = picks.slice(i, i + CONCURRENCY).map(async p => {
+for (let i = 0; i < pending.length; i += CONCURRENCY) {
+  const wave = pending.slice(i, i + CONCURRENCY).map(async p => {
     const r = await probe(p.url);
     results.push({ ...p, ...r });
   });

@@ -489,6 +489,23 @@ const cancelBtn = [...dlgBack2.querySelectorAll('button')].find(b => b.textConte
 cancelBtn.onclick();
 ok(dlgBack2._removed === true, '取消立即关闭浮窗且不上报');
 delete sandbox.reportDeadLink;
+/* ---------- 12e. 站长人工判定（admin_verdict 凌驾于自动双确认，2026-09-19 站主定稿） ---------- */
+storage.set('csc_community_picks', JSON.stringify([...store(),
+  { id: 1720000000002, title: '站长判活的争议条目', url: 'https://example.com/admin-alive', type: 'noise', ratings: [], addedAt: 1720000000002, recommendCount: 1, admin_verdict: 'alive' },
+  { id: 1720000000003, title: '站长判死的条目', url: 'https://example.com/admin-dead', type: 'noise', ratings: [], addedAt: 1720000000003, recommendCount: 1, admin_verdict: 'dead' }
+]));
+await sandbox.refresh();
+sandbox.deadReports = [
+  { pick_id: 1720000000002, uid: 'bot-linkcheck' },
+  { pick_id: 1720000000002, uid: 'userA' },
+  { pick_id: 1720000000002, uid: 'userB' }   /* 机器人 + 2 人本应双确认报警 */
+];
+sandbox.showRankingPage('noise');
+const aliveCard = cards().find(c => cardTitle(c).includes('站长判活'));
+ok(!!aliveCard && !aliveCard.classList.contains('stale') && aliveCard.querySelectorAll('.dead-tag').length === 0, '站长判活 → 机器人+2人举报也不置灰（人工裁决最高优先）');
+const adminDeadCard = cards().find(c => cardTitle(c).includes('站长判死'));
+ok(!!adminDeadCard && adminDeadCard.classList.contains('stale') && adminDeadCard.querySelectorAll('.dead-tag')[0].textContent.includes('站长核实'), '站长判死 → 无需机器人/多人直接置灰 + 「站长核实」徽标');
+sandbox.deadReports = [];
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();
@@ -540,5 +557,19 @@ g('fTitle').value = '';
 g('fUrl').value = 'not a url at all';
 await g('fSubmit').onclick();
 ok(g('fMsg').textContent === '链接无效，请检查', '无效链接文案');
+
+/* ---------- 16. 站长后台 admin.html（公开可访问，但永不内嵌密钥） ---------- */
+const adminHtml = readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
+ok(adminHtml.includes('noindex'), 'admin.html 带 noindex（不进搜索引擎）');
+ok(!/eyJ[A-Za-z0-9_-]{10,}/.test(adminHtml), 'admin.html 无内嵌 JWT（service_role 只能运行时粘贴）');
+ok(!adminHtml.includes('sb_secret_'), 'admin.html 无 sb_secret_ 密钥');
+ok(adminHtml.includes('sb_publishable_'), 'admin.html 仅内嵌公开 anon key（与 index.html 同源）');
+ok(!adminHtml.includes('innerHTML'), 'admin.html 不用 innerHTML（用户提交内容仅 textContent 渲染，防 XSS 偷密钥）');
+ok(!/<script[^>]*src=/.test(adminHtml), 'admin.html 零依赖（无外链脚本）');
+const adminJs = adminHtml.match(/<script>([\s\S]*?)<\/script>/)[1];
+let compiled = true;
+try { new Function(adminJs); } catch (e) { compiled = e.message; }
+ok(compiled === true, 'admin.html 脚本语法编译通过（不执行）', compiled);
+ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), 'admin.html 覆盖 判定列 + 举报/条目清理操作');
 
 console.log('\nALL PASS: ' + pass + ' assertions');

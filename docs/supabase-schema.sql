@@ -65,3 +65,25 @@ create policy "anon select reports" on public.link_reports
 
 create policy "anon insert report" on public.link_reports
   for insert to anon with check (true);
+
+-- ============================================================
+-- v1.4 站长后台（2026-09-19，网站域数据，不进契约 §1）：admin.html 人工判定
+--   admin_verdict      'alive' 人工判活（永久压过一切举报与机器人投票，永不报警）
+--                      | 'dead'  人工判死（直接报警，无需双确认）
+--                      | NULL    走自动双确认：机器人判死 AND ≥2 台设备举报
+--   admin_verified_at  站长操作时间（审计用）
+-- 权限收紧（重点）：anon 的 update/insert 收缩为列级授权——
+--   update 仅 ratings / recommend_count（网站打分与重复提交合并正好只用这两列）；
+--   insert 不含判定列。admin_verdict 只有 service_role 能写，
+--   防止任何人匿名把死链改判活、把好链改判死。
+-- ★ 站长操作：Dashboard → SQL Editor 粘贴下面整段 → Run（可重复执行，幂等）
+-- ============================================================
+alter table community_picks
+  add column if not exists admin_verdict text,
+  add column if not exists admin_verified_at timestamptz;
+
+revoke update on community_picks from anon;
+grant update (ratings, recommend_count) on community_picks to anon;
+
+revoke insert on community_picks from anon;
+grant insert (id, title, url, type, ratings, "addedAt", recommend_count) on community_picks to anon;

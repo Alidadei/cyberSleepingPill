@@ -1663,7 +1663,8 @@
         return { apikey: SUPABASE.anonKey, Authorization: 'Bearer ' + (this._tok || SUPABASE.anonKey), 'Content-Type': 'application/json' };
       },
       async load() {
-        const r = await fetch(this.rest('community_picks?select=id,title,url,type,ratings,addedAt,recommend_count&order=addedAt.desc&limit=1000'), { headers: await this.headers() });
+        /* select=*：admin_verdict 等站长域列存在与否都能工作（DDL 未跑时不炸加载） */
+        const r = await fetch(this.rest('community_picks?select=*&order=addedAt.desc&limit=1000'), { headers: await this.headers() });
         if (!r.ok) throw new Error('load ' + r.status);
         const rows = await r.json();
         /* 前端去重：同 URL 保留 recommend_count 最大的行（历史重复数据兜底） */
@@ -1678,6 +1679,8 @@
           const o = Object.assign({}, r);
           o.recommendCount = Number.isFinite(o.recommend_count) ? Math.trunc(o.recommend_count) : 1;
           delete o.recommend_count;
+          o.adminVerdict = o.admin_verdict || null;   /* 站长人工判定（admin.html 写入，anon 不可写） */
+          delete o.admin_verdict;
           return o;
         });
       },
@@ -2057,9 +2060,9 @@
 
     /* ================= 链接失效举报 =================
        浏览器受 CORS 限制无法探测外链死活 → 社区举报制：
-       访客对社区条目点 ⚠ 上报（(pick_id,uid) 唯一，一人一票），同一 pick_id 有 ≥2 个
-       不同 uid 举报 → 卡片置灰 + 「多人报告」徽标；清理由站长在云端 dashboard 完成。
-       link_reports 是网站域数据，不进契约 §1。var/顶层函数供测试桩注入 */
+       访客对社区条目点 ⚠ 上报（(pick_id,uid) 唯一，一人一票），机器人每日探测投
+       bot-linkcheck 一票；站长在 admin.html 后台人工判活/判死/删除（admin_verdict 列，
+       anon 不可写）。link_reports 与判定列均为网站域数据，不进契约 §1。var/顶层函数供测试桩注入 */
     var deadReports = [];       /* [{pick_id, uid}] */
     const DEAD_HUMAN_THRESHOLD = 2;   /* 「多人」= ≥2 台设备人工举报 */
     const BOT_UID = 'bot-linkcheck';  /* 与 tools/link-check.mjs 约定一致 */
@@ -2072,8 +2075,14 @@
         human++;
         if (r.uid === u) me = true;
       }
-      /* 报警双确认（站主定稿）：机器人判死 AND 多人举报，缺一不可 */
-      return { stale: bot && human >= DEAD_HUMAN_THRESHOLD, bot, human, me };
+      /* 报警三层规则（2026-09-19 站主定稿）：站长人工判定最高优先——
+         判活 → 永不报警（压过机器人与一切举报）；判死 → 直接报警（无需双确认）；
+         无判定 → 自动双确认：机器人判死 AND ≥2 台设备举报，缺一不可 */
+      const p = allPicks.find(x => String(x.id) === String(pickId));
+      const admin = p ? (p.adminVerdict || p.admin_verdict || null) : null;
+      if (admin === 'alive') return { stale: false, bot, human, me, admin };
+      if (admin === 'dead') return { stale: true, bot, human, me, admin };
+      return { stale: bot && human >= DEAD_HUMAN_THRESHOLD, bot, human, me, admin };
     }
     async function reportDeadLink(pickId) {
       if (!(Store && Store.reportDead)) return 'offline';   /* LocalStore（无云端）不提供举报 */
@@ -2655,11 +2664,12 @@
         if (pick.recommendCount != null) {
           m.appendChild(document.createTextNode(' · ' + t('rec_times')(pick.recommendCount || 1)));
         }
-        if (deadInfo(pick.id).stale) {
+        const di = deadInfo(pick.id);
+        if (di.stale) {
           el.classList.add('stale');
           const tag = document.createElement('span');
           tag.className = 'dead-tag';
-          tag.textContent = t('dead_badge');
+          tag.textContent = di.admin === 'dead' ? t('dead_badge_admin') : t('dead_badge');
           m.appendChild(tag);
         }
       } else if (builtin && builtin.sampleRatingAvg != null) {
@@ -2869,6 +2879,7 @@
         dead_report_tip: '链接打不开？报告失效', dead_reported: '已收到反馈（重复只计一次）', dead_report_fail: '上报失败，请稍后再试',
         dead_dlg_title: '反馈链接失效', dead_dlg_body: '这条内容的链接打不开了？确认反馈记一票：同一内容累计 2 人以上报告，卡片会自动置灰提醒其他访客，站长定期清理。匿名提交，一人一票。', dead_dlg_confirm: '确认反馈', dead_dlg_cancel: '取消',
         dead_badge: '⚠ 多人报告 + 机器验证：链接可能已失效',
+        dead_badge_admin: '⚠ 站长核实：链接已失效',
         chip_all: '全部',
         type_anxiety: '焦虑型', type_excitement: '兴奋型', type_physical: '生理型', type_noise: '噪音干扰型',
         form_title: '推荐任意让你犯困的小说、视频、播客…',
@@ -2936,6 +2947,7 @@
         dead_report_tip: 'Link dead? Report it', dead_reported: 'Feedback received (duplicates counted once)', dead_report_fail: 'Failed to report, try again later',
         dead_dlg_title: 'Report a broken link', dead_dlg_body: 'Is this link dead? Confirm to cast one vote — once 2+ visitors report the same item, its card dims automatically to warn others. Anonymous, one vote per device.', dead_dlg_confirm: 'Confirm', dead_dlg_cancel: 'Cancel',
         dead_badge: '⚠ Multi-reported + machine-verified: link may be dead',
+        dead_badge_admin: '⚠ Owner-verified: link is dead',
         chip_all: 'All',
         type_anxiety: 'Anxiety', type_excitement: 'Excitement', type_physical: 'Physical', type_noise: 'Noise',
         form_title: 'Recommend anything that lulls you to sleep — novels, videos, podcasts…',
