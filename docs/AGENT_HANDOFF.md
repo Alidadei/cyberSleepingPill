@@ -96,7 +96,7 @@ cyberSleepCommunity/
 - 分享卡片 og:/canonical **静态写在 head**（微信/QQ/Telegram/百度抓卡片不执行 JS，动态注入等于没有；测试红线禁止回归 JS 注入）。og:image=assets/og-cover.jpg（1200×630 基线 JPEG）。实测：微信贴链接永远纯文本（平台行为，卡片只在内置浏览器菜单分享时生成）；飞书抓得到标题但抓不动 github.io 图片（平台限制，无解，治本=自有域名）
 - 收藏页 = `showRankingPage('favs')` 榜单页型态；同链接样例+社区并存时**社区条目优先去重**；池外收藏（APP 导入的站外内容）直接成卡；导出文件名/格式与 APP `RelaxDataIO` 完全一致（`sleep_station_favorites.json`，RelaxItem 数组，Gson 宽松兼容 → APP 导入零改动）
 - 链接失效：浏览器 CORS 探测不了外链 → 社区举报制（`link_reports` 表，(pick_id,uid) 一人一票，insert-only RLS）；置灰报警为**双确认**（2026-09-17 站主定稿，缺一不可，起因=站主两台设备自测误触发）：机器人 `bot-linkcheck` 每日探测判死 **AND** ≥2 台设备人工举报（`DEAD_HUMAN_THRESHOLD=2`）→ 「⚠ 多人报告 + 机器验证：链接可能已失效」徽标；点 ⚠ 弹「反馈链接失效」确认浮窗（说明机制、确认才上报、成功自动关闭，`openDeadDialog`）；`tools/link-check.mjs` 每日 Actions 自动探测死链投 `bot-linkcheck` 一票（404/410/B站-404-403 才判死，反爬模糊态不判死）；表已建好并验证（2026-09-17）
-- **站长后台 admin.html（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制
+- **站长后台 admin.html（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制。**配色 = 暖白简化调色板**（站主指定采用 `/research-html` 色板：奶油底 #faf8f5 + 暖棕 #8d6e63，红 #b05050 仅危险语义），有意区别于主站深色星空，别"统一"回去
 - 评论功能（未实现，方案冻结）：Supabase comments 表 + RLS（可读可插不可改删）+ AdGuard 词表 + uid 冷却 + 站长手动审核；不进契约；等有日活再上
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 

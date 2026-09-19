@@ -7,42 +7,46 @@
 <meta name="referrer" content="no-referrer">
 <title>站长后台 · 电子安眠药</title>
 <style>
-  :root { color-scheme: dark; }
+  /* 配色 = /research-html 暖白简化调色板（2026-09-19 站主指定）：奶油底 + 暖棕主色，
+     红 #b05050 仅作危险/报警语义；有意区别于主站深色星空，别"统一"回去 */
+  :root { color-scheme: light; }
   * { box-sizing: border-box; }
-  body { margin: 0 auto; padding: 18px 16px 30px; max-width: 1080px; background: #0f1220; color: #d8d4e2;
-         font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; }
-  h1 { font-size: 20px; margin: 0 0 4px; color: #c9aed1; }
-  .sub { margin: 0 0 14px; color: #8f89a3; font-size: 12.5px; }
+  body { margin: 0 auto; padding: 18px 16px 30px; max-width: 1080px; background: #faf8f5; color: #3e3228;
+         font: 14px/1.6 'Segoe UI', system-ui, -apple-system, 'Noto Sans SC', sans-serif; }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #8d6e63; }
+  .sub { margin: 0 0 14px; color: #8c7b6a; font-size: 12.5px; }
   .keybox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input, select, button { font: inherit; background: #1a1e33; color: #d8d4e2; border: 1px solid #343a58; border-radius: 8px; padding: 6px 10px; }
+  input, select, button { font: inherit; background: #ffffff; color: #3e3228; border: 1px solid #ddd4c8; border-radius: 8px; padding: 6px 10px; }
   #keyInput { flex: 1; min-width: 240px; }
   button { cursor: pointer; }
-  button:hover { border-color: #b89bbf; }
-  .warn { color: #a08ca8; font-size: 12px; margin: 6px 0 16px; }
-  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid #4a4f6e; margin-left: 6px; white-space: nowrap; }
-  .chip.readonly { color: #8f89a3; }
-  .chip.admin { color: #9ee2b8; border-color: #4f8a63; }
-  .chip.alarm { color: #ff9e9e; border-color: #a05050; }
-  .chip.vdead { color: #ff9e9e; border-color: #a05050; background: #3a2029; }
-  .chip.valive { color: #9ee2b8; border-color: #4f8a63; background: #1d3128; }
-  .chip.bot { color: #ffc48a; border-color: #a07a45; }
-  .chip.human { color: #ffe08a; border-color: #a08f45; }
+  button:hover { border-color: #8d6e63; color: #8d6e63; }
+  #keyBtn { background: #8d6e63; border-color: #8d6e63; color: #ffffff; }
+  #keyBtn:hover { color: #ffffff; background: #7a5f55; }
+  .warn { color: #b07d4f; font-size: 12px; margin: 6px 0 16px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; border: 1px solid #c4b49e; margin-left: 6px; white-space: nowrap; }
+  .chip.readonly { color: #a89885; border-color: #ddd4c8; }
+  .chip.admin { color: #6d9b7a; border-color: #6d9b7a; background: #edf3ef; }
+  .chip.alarm { color: #b05050; border-color: #b05050; background: #f7ecec; }
+  .chip.vdead { color: #b05050; border-color: #b05050; background: #f7ecec; }
+  .chip.valive { color: #6d9b7a; border-color: #6d9b7a; background: #edf3ef; }
+  .chip.bot { color: #5e84a8; border-color: #7a9ec4; background: #eef3f8; }
+  .chip.human { color: #b07d4f; border-color: #b07d4f; background: #f9f1e8; }
   .bar { display: flex; gap: 8px; flex-wrap: wrap; }
-  .stat { color: #8f89a3; font-size: 12.5px; margin: 8px 0; }
-  .row { background: #171b2e; border: 1px solid #262c47; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
-  .row.alarm { border-color: #7a4040; }
+  .stat { color: #8c7b6a; font-size: 12.5px; margin: 8px 0; }
+  .row { background: #ffffff; border: 1px solid #ddd4c8; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .row.alarm { border-color: #cf9a9a; border-left: 3px solid #b05050; }
   .row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-  a.title { color: #e6dff0; font-weight: 600; text-decoration: none; }
-  a.title:hover { color: #c9aed1; }
-  .row-url { color: #7d7793; font-size: 12px; word-break: break-all; margin: 2px 0; }
-  .row-url a { color: #8f9bd0; text-decoration: none; }
-  .row-meta { color: #8f89a3; font-size: 12px; margin: 4px 0 8px; }
+  a.title { color: #3e3228; font-weight: 600; text-decoration: none; }
+  a.title:hover { color: #8d6e63; }
+  .row-url { color: #a89885; font-size: 12px; word-break: break-all; margin: 2px 0; }
+  .row-url a { color: #7a9ec4; text-decoration: none; }
+  .row-meta { color: #8c7b6a; font-size: 12px; margin: 4px 0 8px; }
   .row-btns { display: flex; gap: 6px; flex-wrap: wrap; }
   .row-btns button { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
-  .danger { border-color: #7a4040; color: #ff9e9e; }
+  .danger { border-color: #d8b4b4; color: #b05050; }
   .msg { min-height: 20px; font-size: 13px; margin: 10px 0 0; }
-  .msg.bad { color: #ff9e9e; }
-  footer { color: #6f6a85; font-size: 12px; border-top: 1px solid #262c47; margin-top: 18px; padding-top: 10px; }
+  .msg.bad { color: #b05050; }
+  footer { color: #a89885; font-size: 12px; border-top: 1px solid #ddd4c8; margin-top: 18px; padding-top: 10px; }
   footer p { margin: 2px 0; }
 </style>
 </head>
