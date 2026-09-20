@@ -1,7 +1,7 @@
 # AGENT_HANDOFF · 电子安眠药（cyberSleepingPill）开发接手指南
 
 > 写给下一个接手本项目的 AI agent。读完这一篇即可开工，不需要问用户任何背景问题。
-> 最后更新：2026-09-19（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
+> 最后更新：2026-09-21（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
 
 ## 0. 一句话定位
 
@@ -46,7 +46,7 @@ cyberSleepCommunity/
 ├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 141 项断言，含 admin 红线扫描）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
 ├── .github/workflows/link-check.yml
-├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / 本文件
+├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / capacity-test / 本文件
 ├── assets/                     # og-cover.jpg（分享封面）+ shoushu.jpg（手书原稿）
 ├── robots.txt / sitemap.xml
 └── README.md
@@ -77,6 +77,7 @@ cyberSleepCommunity/
 5. **APP 收藏增强**：见 `guangnaozhong/fossify-clock/收藏功能增强计划.md`（一键收藏/统一 urlKey/类型标签；网站→APP 收藏文件互通已通）。
 6. **可选**：巡检脚本 `--prune` 自动删死链（需 SERVICE_ROLE secret，删除类操作保持人工触发）；自定义域名（顺带解决飞书/微信抓取 github.io 不稳的问题）。
 7. **远期**：真实评分替换样例演示值（`sampleRatingAvg/Count` 是假数据，接真实聚合）；与 APP「寻找张怀民」联动留言墙。
+8. **承载预案（触发式，未到期）**：云端条目攒到 **200–300 条**时，把 `SupabaseStore.load()` 的全量拉取（limit=1000）改分页/按需 + `select=*` 收窄为具名列——否则月度 egress 配额（免费档约 5GB）会变成每月万次访问的量级。完整测算与复测脚本见 `docs/capacity-test.md`；2026-09-21 实测 60 并发全流程 + 100 脉冲零失败，在那之前不动。
 
 ## 5. APP 端速查（跨项目协作时）
 
@@ -114,3 +115,4 @@ cyberSleepCommunity/
 8. **测试断言挂了先加诊断输出再猜**（ok() 的 extra 参数会打印），本仓多次"灵异失败"最后都是状态没进预期分支。
 9. **外部服务的能力边界先查证再写方案**：GitHub Sponsors 大陆不可收款、飞书不渲染 github.io 预览图、浏览器探测不了跨域死活——都查证过，别在方案里复活这些死路。
 10. **git push 到 github.com 失败按报错形态对号入座**：① `SSL_ERROR_SYSCALL` = HTTP/2 被干扰 → `git -c http.version=HTTP/1.1 push`（2026-09-17）；② `Failed to connect to 127.0.0.1 port 7890` = git 配置的代理没开，直连也会被墙（reset/timeout）——先 `netstat -an | grep LISTENING` 找实际代理端口（Clash Verge 新默认 7897，2026-09-19 实测），`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=... push` 即过。另：`git push | tail` 吞退出码，重试循环必须判断 git 本身的退出码。
+11. **免费档永远别做破坏性压测**：Supabase 前面是 Cloudflare，压测工具往死里打可能被判滥用封项目——承载问题用「真实访客级」温和模拟回答就够了（分档 1/10/30/60 并发全流程 + 100 脉冲，只读约 400 请求），方法、脚本、判读标准已沉淀 `docs/capacity-test.md`，复测直接用，别另起炉灶。
