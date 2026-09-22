@@ -15,7 +15,7 @@
 ```bash
 # ① 语法：抽出内联 <script> 做语法检查
 awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html > /tmp/s.js && node --check /tmp/s.js
-# ② 行为回归：零依赖 DOM 桩测试（当前 156 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线）
+# ② 行为回归：零依赖 DOM 桩测试（当前 168 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线）
 node tests/dom-test.mjs
 # ③ 本地预览（后台常驻；跨会话可能被回收，用前先 curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8642/ 探活）
 python -m http.server 8642 --bind 127.0.0.1
@@ -41,9 +41,9 @@ python -m http.server 8642 --bind 127.0.0.1
 ```
 cyberSleepCommunity/
 ├── index.html                  # 单文件站全部 HTML/CSS/JS（当前 ~3000 行）
-├── adm/index.html              # 站长后台：人工判活/判死/清举报/删条目（noindex，永不内嵌密钥）
+├── adm/index.html              # 站长后台：人工判活/判死/清举报/删条目 + 留言审核（noindex，永不内嵌密钥）
 ├── data/index.html             # 数据页：画像/推荐/链接健康统计，密钥门禁 + 30 秒自刷（noindex）
-├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 156 项断言，含 admin/样例下线红线扫描）
+├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 168 项断言，含 admin/样例下线红线扫描）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
 ├── .github/workflows/link-check.yml
 ├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / capacity-test / 本文件
@@ -52,13 +52,13 @@ cyberSleepCommunity/
 └── README.md
 ```
 
-**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单，**自定义标签同义词折叠**）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、推荐留言 note（契约 v1.3，卡片随卡展示）、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 /data（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单。**云端三表 live**（community_picks / user_profiles / link_reports），v1.4+v1.5 DDL 已执行（2026-09-23）：`admin_verdict` / `note` 列生效，后台判定与留言落库全功能；云端现有数据极少（个位数条目）。
+**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单，**自定义标签同义词折叠**）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、推荐留言 note（契约 v1.3，卡片随卡展示）+ **每条内容一个留言板**（评论功能解冻形态）、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 /data（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单。**云端三表 live**（community_picks / user_profiles / link_reports），v1.4+v1.5 DDL 已执行（2026-09-23）：`admin_verdict` / `note` 列生效；**v1.6（comments 留言表 + note_len 约束）待站主执行**，未执行前留言板显示加载失败但不炸主站；云端现有数据极少（个位数条目）。
 
 **有意下线的东西（不要恢复）**：导航栏 导出/导入（社区数据以云端为唯一通道，顺带堵掉了绕过 AdGuard 的批量导入口子）；网站介绍按钮（注释保留）；emoji 图标（仅历史品牌位）；**内置精选样例+示例评分（2026-09-23 站主指令整体删除，站内只展示真实社区条目）**。
 
 ## 3. 铁律（改代码前必读）
 
-1. **改数据结构先改 `docs/DATA_CONTRACT.md` 并升版本号**，三处同步：网站 `index.html`、APP `RelaxStore.kt`、`adguard-rules.json`。网站域数据（收藏 `csc_favorites`、`link_reports` 表）**有意不进契约**，别手痒合并。
+1. **改数据结构先改 `docs/DATA_CONTRACT.md` 并升版本号**，三处同步：网站 `index.html`、APP `RelaxStore.kt`、`adguard-rules.json`。网站域数据（收藏 `csc_favorites`、`link_reports`、`comments` 留言表）**有意不进契约**，别手痒合并。
 2. **零依赖单文件**。不引入框架/npm 构建链/SDK；云端用原生 fetch 调 PostgREST。
 3. **绝不引入广告、追踪器、Cookie 横幅**；新第三方静态资源也要先过问站主。
 4. `CommunityPick.id` 是 epoch 毫秒 number（APP 端 Long）；排序规则（平均分→评分数→addedAt）两端一致。
@@ -69,10 +69,10 @@ cyberSleepCommunity/
 
 ## 4. 未来任务（按优先级）
 
-0. **已完成（2026-09-23 站主在 Dashboard 执行 v1.4+v1.5，agent 已用 anon key 探测验证）**：`admin_verdict` / `admin_verified_at` / `note` 三列与列级授权全部 live——/adm 判活判死、推荐留言落库均为全功能状态。今后再加列：照旧在 `docs/supabase-schema.sql` 尾部追加新段交站主粘贴，或配好 MCP access token 后由 agent 用 `apply_migration` 执行。
+0. **待站主执行（v1.6 留言板 DDL）**：Dashboard → SQL Editor 粘贴 `docs/supabase-schema.sql` 尾部「v1.6 留言板」整段（幂等）。内容：① `community_picks` 加 `note_len` CHECK（≤200，服务端硬约束，堵公开 anon key 直插超长留言的缝）；② 新建 `comments` 留言表（RLS 可读可发、无改删策略、FK 级联删除）。**v1.6 未执行前**：主站其余功能全正常，点卡片「留言」会显示「失败了请稍后再试」、/adm 留言区会提示表未建；执行后全部生效（v1.4/v1.5 已于 2026-09-23 执行 ✓）。
 1. **APP 端云端同步（P1 收尾）**：`RelaxStore.kt` 是预留换源点，需写 `RemoteStore.kt`（HttpURLConnection 调同一 REST）+「社区云同步」开关。网站端已就绪。
 2. **内容量冷启动**：样例下线（2026-09-23）后站内只有真实社区条目，当前仍是个位数，目标 30–50 条（收录眼光是站主的活，agent 可协助批量抓取/整理候选）。样例下线后首页/空类型显示空态引导文案，属预期，别当 bug 修。
-3. **评论功能**：站主已拍板"要做但等有日活"。方案已备（见 §6 评论条目），落地即建 `comments` 表 + AdGuard 词表过滤 + 冷却 + 站主手动审核。
+3. **评论功能（2026-09-23 解冻上线，形态=每条内容一个留言板）**：点社区卡片「留言」按钮 → 独立弹层（列表时间正序 + 自己 uid 带「我」标记 + 打开内容链接 + 输入发布）。闸门：AdGuard（提交时）+ 同 uid 60s 冷却（localStorage `csc_last_msg`）+ ≤200 字 + RLS 无改删策略；按需拉取不随页面加载（保 egress）。站长审核在 /adm「留言审核」区。原冻结方案（等有日活）被站主此令取代。
 4. **语言标注**：决议=不分区、混排；等真实英文流量出现后做"标题 CJK 启发式标注 + 筛选 chip"（契约零改动方案已议）。
 5. **APP 收藏增强**：见 `guangnaozhong/fossify-clock/收藏功能增强计划.md`（一键收藏/统一 urlKey/类型标签；网站→APP 收藏文件互通已通）。
 6. **可选**：巡检脚本 `--prune` 自动删死链（需 SERVICE_ROLE secret，删除类操作保持人工触发）；自定义域名（顺带解决飞书/微信抓取 github.io 不稳的问题）。
@@ -102,12 +102,13 @@ cyberSleepCommunity/
 - **站长后台 /adm（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制。顶部常驻导航（数据页入口 + 返回主站）。**配色 = 暖白简化调色板**（站主指定采用 `/research-html` 色板：奶油底 #faf8f5 + 暖棕 #8d6e63，红 #b05050 仅危险语义），有意区别于主站深色星空，别"统一"回去
 - **数据页 /data（2026-09-19）**：密钥门禁（同 /adm，service_role 运行时粘贴仅内存，进入前不渲染任何数据）；顶部常驻导航（站长后台入口 + 返回主站）；总览/用户画像/推荐内容/链接健康四区，进入后每 30 秒自动刷新；纯客户端聚合（三表全量拉取 limit 2000/5000，规模大后应改 PostgREST 聚合或视图）；画像标签映射与站内 `AGE_GROUP_KEYS/GENDER_KEYS/EDU_KEYS` 一致（未知值原样显示）；报警口径与主站三层规则同源（含 admin_verdict）；配色同 /adm 暖白简化；noindex + robots Disallow + 主站无入口
 - **样例整体下线 + 同义词折叠 + 推荐留言（2026-09-23，站主三项指令，契约 v1.3 / schema v1.5）**：① 内置精选样例（BUILTIN 四条+示例评分+csc_sample_ratings+「APP 同款」徽章+【样例】前缀）**全部删除**——推翻 2026-09-10「每型一条样例」决定，站内只剩真实社区条目，空类型显示空态引导；测试有「无 BUILTIN/sampleRating/【样例】残留」红线，勿恢复。② 自定义标签**同义词折叠**（`TYPE_SYNONYMS` + `normType`）：写入口径（normalizeTag）与渲染口径共用一表，「兴奋睡不着」→`excitement`（站主云端真实数据里的首例同义分裂）；`/data` 数据页同源一份，类型分布不再分裂；无法归类的自由标签仍按 v1.1 原样保留。同义词表**有意不追求穷举、也绝不在运行时集成任何语义模型/API**（站主 2026-09-23：语义判定由维护 agent 离线做、模型不写死，常备流程见 §4.9）。③ 新增**推荐留言 note**（契约 v1.3 选填字段）：提交框 maxlength=60、与标题/URL/标签一起过 AdGuard、卡片「留言」居中样式展示、同 URL 合并保留首条；云端列 `note`（schema v1.5，列级 insert 授权已含），**DDL 未执行时 add 自动降级为无留言重试**（推荐本体不失败）；APP 端 Gson 容忍缺失，代码零改动。CDP 截图抓过一次 note 靠左不居中的视觉问题——卡片内容全是居中风格，新块级元素记得 `text-align:center`。同日站主手机端反馈：长标题换行时序号被 `.head` 的 `justify-content:center` 挤成独占一行居中、与短标题卡不一致 → **≤640px 断点内 .card .head 改 `flex-start` + rank 加 min-width 2.2em**；同日二轮拍板：**标题独占一行（.t flex-basis:100%），评分/收藏/举报三按钮恒同一行**（移动端排行卡统一为「序号→标题→按钮行→居中 meta→留言」结构，桌面端居中审美不变，勿"统一"回桌面）。
-- 评论功能（未实现，方案冻结）：Supabase comments 表 + RLS（可读可插不可改删）+ AdGuard 词表 + uid 冷却 + 站长手动审核；不进契约；等有日活再上
+- **留言板（2026-09-23，站主指令「点开后跳到单独的留言界面」）**：社区卡片新增「留言」按钮（与举报同门控：仅云端 Store 渲染）→ 独立弹层 `openMsgBoard`（z-70，ESC/返回手势/点遮罩均可关，popstate 用 `msgPopping` 旗标防止"关板顺带关榜"）。发布闸门：AdGuard → 60s/uid 冷却 → 200 字截断；纯 textContent。入口不做成"整卡点击"——卡片主点击仍是打开外部内容（产品核心循环），别改。schema v1.6：comments 表 + note_len 约束；DDL 未执行时留言板显示加载失败（不炸主站）。
+- ~~评论功能（未实现，方案冻结）~~ **2026-09-23 已解冻上线**（形态改为"每条内容一个留言板"，见 §4.3）
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 
 ## 7. 开发经验与教训（每条都交过学费）
 
-1. **验证金字塔**：`node --check` → DOM 桩 156 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。CDP 注入注意：Node 24 内置 WebSocket 是 EventTarget 风格（`addEventListener`，没有 `.on()`）。
+1. **验证金字塔**：`node --check` → DOM 桩 168 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。CDP 注入注意：Node 24 内置 WebSocket 是 EventTarget 风格（`addEventListener`，没有 `.on()`）。
 2. **分享卡片类功能必须静态写 head**——一切"运行时注入元数据"的方案对不执行 JS 的爬虫无效。
 3. **存储结构升级别忘了写 key**：收藏从 urlKey 字符串升级为对象时，第一版漏存 `key` 字段，读回全被丢弃——schema 变更后立刻跑真实链路测试，别只看"没报错"。
 4. **bash heredoc 反引号会吞字**：写含反引号/`$` 的内容用 `<<'EOF'`（带引号）或 python；`sed -i` 改文件后 Edit 工具会拒绝（文件状态过期），重新 Read 即可。

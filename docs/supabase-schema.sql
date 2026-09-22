@@ -99,3 +99,37 @@ alter table community_picks
 
 revoke insert on community_picks from anon;
 grant insert (id, title, url, type, ratings, "addedAt", recommend_count, note) on community_picks to anon;
+
+-- ============================================================
+-- v1.6 留言板（2026-09-23，网站域数据，不进契约 §1）
+--   ① community_picks.note 服务端长度硬约束（在 v1.5 网页端三道闸之外再补一道）：
+--      理论上有人绕过网页拿公开 anon key 直插超长留言，这里服务端硬拒绝
+--   ② comments 表：每条推荐内容一个留言板（pick_id → community_picks.id，级联删除）
+--     anon 可读可发（RLS），无 update/delete 策略 = 不可改删；删除仅站长在 /adm 后台
+-- ★ 站长操作：Dashboard → SQL Editor 粘贴下面整段 → Run（幂等，可重复执行）
+-- ============================================================
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'note_len') then
+    alter table community_picks add constraint note_len check (char_length(note) <= 200);
+  end if;
+end $$;
+
+create table if not exists public.comments (
+  id         bigint generated always as identity primary key,
+  pick_id    bigint not null references public.community_picks(id) on delete cascade,
+  uid        text not null,
+  body       text not null check (char_length(body) <= 200),
+  created_at timestamptz not null default now()
+);
+create index if not exists comments_pick_idx on public.comments (pick_id, created_at);
+
+alter table public.comments enable row level security;
+drop policy if exists "anon read comments" on public.comments;
+create policy "anon read comments" on public.comments
+  for select to anon using (true);
+drop policy if exists "anon insert comment" on public.comments;
+create policy "anon insert comment" on public.comments
+  for insert to anon with check (char_length(body) <= 200 and char_length(uid) > 0);
+
+grant select on public.comments to anon;
+grant insert (pick_id, uid, body) on public.comments to anon;

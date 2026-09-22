@@ -550,6 +550,134 @@
       color: var(--bad)
     }
 
+    /* ---- 留言板（v1.6 comments）：卡片入口按钮 + 独立弹层 ---- */
+    .card .msgbtn {
+      position: relative;
+      flex-shrink: 0;
+      font-size: 13px;
+      color: var(--grey);
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 2px 12px;
+      font-family: inherit;
+      transition: border-color .2s
+    }
+    .msgboard-back {
+      position: fixed;
+      inset: 0;
+      background: rgb(var(--bg-rgb) / .55);
+      z-index: 70;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px
+    }
+    .msgboard {
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px 18px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 80vh
+    }
+    .msgboard-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px
+    }
+    .msgboard-backbtn {
+      flex-shrink: 0;
+      border: 1px solid var(--line);
+      background: none;
+      color: var(--sub);
+      border-radius: 10px;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px
+    }
+    .msgboard-title {
+      font-weight: 600;
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+    .msgboard-open {
+      align-self: flex-start;
+      font-size: 13px;
+      color: var(--sub);
+      margin-bottom: 4px
+    }
+    .msgboard-list {
+      overflow-y: auto;
+      min-height: 56px;
+      margin: 10px 0
+    }
+    .msgboard-item {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 8px
+    }
+    .msgboard-body {
+      font-size: 14px;
+      color: var(--ink);
+      line-height: 1.5;
+      overflow-wrap: anywhere
+    }
+    .msgboard-meta {
+      font-size: 11.5px;
+      color: var(--grey);
+      margin-top: 4px
+    }
+    .msgboard-empty {
+      font-size: 13px;
+      color: var(--sub);
+      padding: 14px 0;
+      text-align: center
+    }
+    .msgboard-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px
+    }
+    .msgboard-input {
+      flex: 1;
+      min-width: 0;
+      font: inherit;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px
+    }
+    .msgboard-post {
+      flex-shrink: 0;
+      font: inherit;
+      cursor: pointer;
+      background: transparent;
+      color: var(--sub);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 14px;
+      transition: border-color .2s
+    }
+    .msgboard-post:hover { border-color: var(--grey); color: var(--ink) }
+    .msgboard-hint {
+      min-height: 18px;
+      font-size: 12.5px;
+      color: var(--sub);
+      margin-top: 6px
+    }
+    .msgboard-hint.bad { color: var(--bad) }
+
     .type {
       display: inline-block;
       font-size: 12px;
@@ -1763,6 +1891,18 @@
         const r = await fetch(this.rest('link_reports?select=pick_id,uid&limit=5000'), { headers: await this.headers() });
         if (!r.ok) throw new Error('deadReports ' + r.status);
         return r.json();
+      },
+      /* 留言板（v1.6 comments 表，网站域数据）：每条内容一个板，按需拉取（不随页面加载，省 egress）。
+         LocalStore 无此二方法 → 离线模式卡片不显示留言按钮（与 reportDead 同一门控） */
+      async commentList(pickId) {
+        const r = await fetch(this.rest('comments?pick_id=eq.' + encodeURIComponent(String(pickId)) + '&select=id,uid,body,created_at&order=created_at.asc&limit=200'), { headers: await this.headers() });
+        if (!r.ok) throw new Error('comments ' + r.status);
+        return r.json();
+      },
+      async commentAdd(pickId, body) {
+        const row = { pick_id: String(pickId), uid: profileUid(), body: String(body).slice(0, 200) };
+        const r = await fetch(this.rest('comments'), { method: 'POST', headers: Object.assign({ Prefer: 'return=minimal' }, await this.headers()), body: JSON.stringify(row) });
+        if (!r.ok) throw new Error('comment add ' + r.status);
       }
     };
 
@@ -2120,6 +2260,134 @@
         }
       };
       return back;
+    }
+
+    /* ================= 留言板（每条内容一个，v1.6 comments 表，站主 2026-09-23） =================
+       点卡片「留言」进入：看全部留言、发新留言。按需拉取（不随页面加载，省 egress）；
+       发布过 AdGuard + 同一 uid 60s 冷却（localStorage）；纯 textContent 渲染防 XSS */
+    var msgBoardEl = null, msgPopping = false;
+    function fmtMsgTime(iso) {
+      try {
+        const d = new Date(iso), now = new Date();
+        const hm = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+        return d.toDateString() === now.toDateString() ? hm : (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hm;
+      } catch (e) { return ''; }
+    }
+    function closeMsgBoard() {
+      if (!msgBoardEl) return;
+      msgBoardEl.remove();
+      msgBoardEl = null;
+      if (history.state && history.state.msg) { msgPopping = true; history.back(); }
+    }
+    async function openMsgBoard(pick) {
+      if (msgBoardEl) { msgBoardEl.remove(); msgBoardEl = null; }
+      if (!history.state || !history.state.msg) history.pushState({ msg: true }, '');
+      const back = document.createElement('div');
+      back.className = 'msgboard-back';
+      back.addEventListener('click', e => { if (e.target === back) closeMsgBoard(); });
+      const panel = document.createElement('div');
+      panel.className = 'msgboard';
+      const head = document.createElement('div');
+      head.className = 'msgboard-head';
+      const backBtn = document.createElement('button');
+      backBtn.type = 'button';
+      backBtn.className = 'msgboard-backbtn';
+      backBtn.textContent = '← ' + t('back');
+      backBtn.onclick = () => closeMsgBoard();
+      head.appendChild(backBtn);
+      const ttl = document.createElement('span');
+      ttl.className = 'msgboard-title';
+      ttl.textContent = (pick.title || '').slice(0, 24);
+      head.appendChild(ttl);
+      panel.appendChild(head);
+      if (/^https?:\/\//i.test(pick.url || '')) {
+        const open = document.createElement('a');
+        open.className = 'msgboard-open';
+        open.href = pick.url;
+        open.target = '_blank';
+        open.rel = 'noopener noreferrer';
+        open.textContent = t('msg_open') + ' ↗';
+        panel.appendChild(open);
+      }
+      const listEl = document.createElement('div');
+      listEl.className = 'msgboard-list';
+      panel.appendChild(listEl);
+      const hint = document.createElement('div');
+      hint.className = 'msgboard-hint';
+      panel.appendChild(hint);
+      const row = document.createElement('div');
+      row.className = 'msgboard-row';
+      const input = document.createElement('input');
+      input.className = 'msgboard-input';
+      input.maxLength = 200;
+      input.placeholder = t('msg_ph');
+      input.setAttribute('aria-label', t('msg_ph'));
+      const postBtn = document.createElement('button');
+      postBtn.type = 'button';
+      postBtn.className = 'msgboard-post focusable';
+      postBtn.textContent = t('msg_post');
+      row.appendChild(input);
+      row.appendChild(postBtn);
+      panel.appendChild(row);
+      back.appendChild(panel);
+      document.body.appendChild(back);
+      msgBoardEl = back;
+
+      const me = profileUid();
+      async function loadList() {
+        listEl.textContent = t('msg_loading');
+        try {
+          const rows = await SupabaseStore.commentList(pick.id);
+          listEl.textContent = '';
+          if (!rows.length) {
+            const empty = document.createElement('div');
+            empty.className = 'msgboard-empty';
+            empty.textContent = t('msg_none');
+            listEl.appendChild(empty);
+            return;
+          }
+          rows.forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'msgboard-item';
+            const line = document.createElement('div');
+            line.className = 'msgboard-body';
+            line.textContent = r.body;
+            item.appendChild(line);
+            const meta = document.createElement('div');
+            meta.className = 'msgboard-meta';
+            meta.textContent = fmtMsgTime(r.created_at) + (r.uid === me ? ' · ' + t('msg_mine') : '');
+            item.appendChild(meta);
+            listEl.appendChild(item);
+          });
+          listEl.scrollTop = listEl.scrollHeight;
+        } catch (e) {
+          listEl.textContent = t('msg_fail');
+        }
+      }
+      postBtn.onclick = async () => {
+        const body = input.value.trim();
+        if (!body) return;
+        hint.textContent = '';
+        hint.className = 'msgboard-hint';
+        const v = ADGUARD.check(body);
+        if (!v.ok) { hint.textContent = t(v.code)(v.param); hint.classList.add('bad'); return; }
+        let last = 0;
+        try { last = Number(localStorage.getItem('csc_last_msg')) || 0; } catch (e) { }
+        if (Date.now() - last < 60000) { hint.textContent = t('msg_cool'); hint.classList.add('bad'); return; }
+        postBtn.disabled = true;
+        try {
+          await SupabaseStore.commentAdd(pick.id, body);
+          try { localStorage.setItem('csc_last_msg', String(Date.now())); } catch (e) { }
+          input.value = '';
+          await loadList();
+        } catch (e) {
+          hint.textContent = t('msg_fail');
+          hint.classList.add('bad');
+        }
+        postBtn.disabled = false;
+      };
+      loadList();
+      if (input.focus) try { input.focus(); } catch (e) { }
     }
 
     /* ================= 渲染 ================= */
@@ -2600,6 +2868,17 @@
         };
         head.appendChild(dead);
       }
+      /* 留言板入口（站主 2026-09-23）：每条内容一个独立留言板；仅云端社区条目显示
+         （离线 LocalStore 无 commentList，与举报按钮同一门控） */
+      if (isCommunity && pick && Store.commentList) {
+        const mb = document.createElement('button');
+        mb.type = 'button';
+        mb.className = 'msgbtn focusable';
+        mb.textContent = t('msg_btn');
+        mb.setAttribute('aria-haspopup', 'dialog');
+        mb.onclick = () => openMsgBoard(pick);
+        head.appendChild(mb);
+      }
       el.appendChild(head);
 
       const m = document.createElement('div');
@@ -2691,9 +2970,13 @@
         done.textContent = t('rate_fail');
       }
     }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeStars(); closePanel(); closeLetter(); closeRankingPage(); closeHamburger(); } });
-    /* 移动端后退手势 / 浏览器后退键：关榜回首页 */
-    window.addEventListener('popstate', () => { if (document.getElementById('rankingOverlay')?.classList.contains('open')) { closeRankingPage(); } });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeStars(); closePanel(); closeLetter(); closeMsgBoard(); closeRankingPage(); closeHamburger(); } });
+    /* 移动端后退手势 / 浏览器后退键：关留言板 / 关榜回首页（板在榜上层，先关板） */
+    window.addEventListener('popstate', () => {
+      if (msgPopping) { msgPopping = false; return; }
+      if (msgBoardEl) { closeMsgBoard(); return; }
+      if (document.getElementById('rankingOverlay')?.classList.contains('open')) { closeRankingPage(); }
+    });
 
     /* ================= 提交 ================= */
     document.getElementById('fUrl').addEventListener('input', e => {
@@ -2849,6 +3132,9 @@
         label_url: '链接', ph_url: 'https:// …（B站分享文本直接粘贴也行）',
         label_type: '适合哪类失眠的人（选填）',
         label_note: '推荐留言（选填）', ph_note: '例：兴奋睡不着，听这个半小时就困了（≤60字）',
+        msg_btn: '留言', msg_open: '打开内容', msg_ph: '说点什么…（≤200字）', msg_post: '发布',
+        msg_none: '还没有留言，来抢头柱', msg_fail: '失败了，请稍后再试',
+        msg_cool: '发得太快啦，歇一会再留言', msg_mine: '我', msg_loading: '加载中…',
         opt_none: '不确定 / 通用', opt_anxiety: '焦虑型 · 思绪停不下来', opt_excitement: '兴奋型 · 大脑过电影', opt_physical: '生理型 · 浑身不得劲', opt_noise: '噪音干扰型 · 环境吵',
         submit: '提交推荐', form_hint: '含广告卖货 / 联系方式的内容会被直接拦下（与 APP 同一套 AdGuard 规则）',
         prescribed: '已发布 ✓ 感谢为同类型的失眠伙伴添砖加瓦', publish_fail: '发布失败，请稍后再试',
@@ -2916,6 +3202,9 @@
         label_url: 'Link', ph_url: 'https:// … (pasting a share text works too)',
         label_type: 'Who is it for? (optional)',
         label_note: 'Note (optional)', ph_note: 'e.g. "Too excited to sleep — this knocks me out in 30 min" (≤60 chars)',
+        msg_btn: 'Notes', msg_open: 'Open link', msg_ph: 'Say something… (≤200 chars)', msg_post: 'Post',
+        msg_none: 'No notes yet — be the first', msg_fail: 'Failed, please try again later',
+        msg_cool: 'Too fast — take a break before posting again', msg_mine: 'me', msg_loading: 'Loading…',
         opt_none: 'Not sure / General', opt_anxiety: 'Anxiety · racing mind', opt_excitement: 'Excitement · mind keeps replaying the day', opt_physical: 'Physical · body won\'t settle', opt_noise: 'Noise · the world is too loud',
         submit: 'Submit', form_hint: 'Ads and solicitation are filtered automatically (same rules as the Sleep Station app)',
         prescribed: 'Prescribed ✓ thanks for helping fellow sleepless souls', publish_fail: 'Failed to publish, please try again later',

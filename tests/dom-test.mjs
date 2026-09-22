@@ -570,6 +570,46 @@ sandbox.fetch = async (url) => {
 const loaded = await sandbox.SupabaseStore.load();
 ok(loaded[0].note === '好睡', 'load 映射云端 note 字段', loaded[0]);
 sandbox.fetch = () => Promise.reject(new Error('offline in tests'));
+/* ---------- 12g. 留言板（v1.6 comments：存取载荷 / 弹层 UI / AdGuard / 冷却 / 按钮门控） ---------- */
+ok(cards().every(c => c.querySelectorAll('.msgbtn').length === 0), '离线 LocalStore 模式不渲染留言按钮');
+let commentCalls = [];
+const myUid = storage.get('csc_uid');
+sandbox.fetch = async (url, opts) => {
+  const u = String(url), method = (opts && opts.method) || 'GET';
+  if (u.includes('/comments')) {
+    commentCalls.push({ url: u, method, body: opts && opts.body });
+    if (method === 'GET') return { ok: true, status: 200, json: async () => [
+      { id: 1, uid: 'someoneElse', body: '好睡', created_at: '2026-09-23T10:00:00Z' },
+      { id: 2, uid: myUid, body: '听完这条真的困了', created_at: '2026-09-23T11:00:00Z' }
+    ] };
+    return { ok: true, status: 201, json: async () => [] };
+  }
+  return { ok: true, status: 200, json: async () => [] };
+};
+await sandbox.openMsgBoard({ id: 123, title: '留言板测试条目', url: 'https://example.com/x' });
+await sleep(20);   /* loadList 是异步补挂的：等它完成再断言 */
+const board = bodyKids.filter(n => n.className === 'msgboard-back').pop();
+ok(!!board && board.textContent.includes('留言板测试条目'), '留言板弹层随打开渲染');
+ok(commentCalls[0].url.includes('comments?pick_id=eq.123') && commentCalls[0].url.includes('created_at.asc'), '按 pick_id 拉取留言（时间正序、按需不随页面）');
+ok(board.textContent.includes('好睡') && board.textContent.includes('听完这条真的困了'), '留言列表渲染');
+ok(board.querySelectorAll('.msgboard-item')[1].textContent.includes('· 我'), '自己 uid 的留言带「我」标记');
+const mInput = board.querySelectorAll('.msgboard-input')[0];
+const mPost = board.querySelectorAll('.msgboard-post')[0];
+mInput.value = '加微信 abc12345 一起失眠';
+await mPost.onclick();
+ok(commentCalls.filter(c => c.method === 'POST').length === 0 && board.textContent.includes('未发布：'), '留言含联系方式被 AdGuard 拦截');
+storage.delete('csc_last_msg');
+mInput.value = '这条很助眠';
+await mPost.onclick();
+const postCall = commentCalls.filter(c => c.method === 'POST')[0];
+ok(!!postCall && JSON.parse(postCall.body).pick_id === '123' && JSON.parse(postCall.body).body === '这条很助眠' && (JSON.parse(postCall.body).uid || '').length > 0, '发布载荷含 pick_id/uid/body');
+ok(JSON.parse(postCall.body).body.length <= 200, '留言 ≤200 字');
+mInput.value = '再来一条';
+await mPost.onclick();
+ok(commentCalls.filter(c => c.method === 'POST').length === 1 && board.textContent.includes('发得太快啦'), '60s 冷却生效（同 uid 短时二发被拦）');
+sandbox.closeMsgBoard();
+ok(!bodyKids.some(n => n.className === 'msgboard-back' && !n._removed), '关闭留言板弹层移除');
+sandbox.fetch = () => Promise.reject(new Error('offline in tests'));
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();
@@ -636,6 +676,9 @@ try { new Function(adminJs); } catch (e) { compiled = e.message; }
 ok(compiled === true, '/adm 脚本语法编译通过（不执行）', compiled);
 ok(adminHtml.includes('admin_verdict') && adminHtml.includes('link_reports'), '/adm 覆盖 判定列 + 举报/条目清理操作');
 ok(adminHtml.includes('href="../data/"') && adminHtml.includes('href="../"'), '/adm 常驻导航：数据页入口 + 返回主站');
+ok(adminHtml.includes('loadComments') && adminHtml.includes('留言审核') && adminHtml.includes("comments?select="), '/adm 含留言审核区（读最新留言 + service_role 删除）');
+const schemaSql = readFileSync(new URL('../docs/supabase-schema.sql', import.meta.url), 'utf8');
+ok(schemaSql.includes('note_len') && schemaSql.includes('create table if not exists public.comments'), 'schema v1.6：note 长度约束 + comments 留言板表');
 const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
 ok(gitignore.includes('service_role') && gitignore.includes('.env'), '.gitignore 忽略密钥文件（service_role*/.env，防手滑提交）');
 /* ---------- 16b. 数据页 /data（密钥门禁；同套红线扫描） ---------- */

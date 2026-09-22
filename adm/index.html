@@ -49,6 +49,10 @@
   .danger { border-color: #d8b4b4; color: #b05050; }
   .msg { min-height: 20px; font-size: 13px; margin: 10px 0 0; }
   .msg.bad { color: #b05050; }
+  .msgmod { margin-top: 22px; border-top: 1px solid #ddd4c8; padding-top: 14px; }
+  .msgmod h2 { font-size: 16px; margin: 0 0 6px; color: #8d6e63; }
+  .cbody { font-size: 14px; color: #3e3228; margin: 4px 0; overflow-wrap: anywhere; }
+  .cmeta { color: #a89885; font-size: 12px; margin: 2px 0 8px; }
   footer { color: #a89885; font-size: 12px; border-top: 1px solid #ddd4c8; margin-top: 18px; padding-top: 10px; }
   footer p { margin: 2px 0; }
 </style>
@@ -85,6 +89,13 @@
 <p id="stat" class="stat">加载中…</p>
 <div id="rows"></div>
 <p id="msg" class="msg"></p>
+
+<section class="msgmod">
+  <h2>留言审核</h2>
+  <p class="stat">每条推荐内容一个留言板（comments 表）。删除不可恢复； anon 不可改删留言，只有这里能删。</p>
+  <div class="bar"><button id="msgReload" type="button">刷新留言</button><span id="msgStat" class="stat"></span></div>
+  <div id="msgRows"></div>
+</section>
 
 <footer>
   <p>报警规则：站长判死，或（无判定时）机器人判死 AND ≥2 台设备举报；站长判活永久压过一切举报与机器人投票。</p>
@@ -363,8 +374,58 @@ $('reload').onclick = () => load();
 $('filter').onchange = () => render();
 $('q').oninput = () => render();
 
+/* ---- 留言审核（v1.6 comments 表）：anon 读最新 50 条；删除走 service_role ---- */
+async function loadComments() {
+  var box = $('msgRows'), st = $('msgStat');
+  box.textContent = '';
+  st.textContent = '加载中…';
+  try {
+    var rows = await api('GET', 'comments?select=id,pick_id,uid,body,created_at&order=created_at.desc&limit=50', undefined, false);
+    st.textContent = '最新 ' + rows.length + ' 条';
+    if (!rows.length) { box.appendChild(makeEmpty()).textContent = '（还没有留言）'; return; }
+    rows.forEach(function (c) {
+      var p = state.picks.find(function (x) { return String(x.id) === String(c.pick_id); });
+      var row = document.createElement('div');
+      row.className = 'row';
+      var b = document.createElement('div');
+      b.className = 'cbody';
+      b.textContent = c.body;
+      row.appendChild(b);
+      var m = document.createElement('div');
+      m.className = 'cmeta';
+      m.textContent = '于「' + (p ? p.title : '已删除条目 #' + c.pick_id) + '」 · ' +
+        String(c.created_at || '').slice(0, 16).replace('T', ' ') + ' · uid ' + String(c.uid || '').slice(0, 12);
+      row.appendChild(m);
+      var btns = document.createElement('div');
+      btns.className = 'row-btns';
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'danger';
+      del.textContent = '删除留言';
+      del.onclick = async () => {
+        if (!guard()) return;
+        if (!confirm('确定删除这条留言？\n' + c.body)) return;
+        try {
+          await api('DELETE', 'comments?id=eq.' + c.id, undefined, true);
+          note('✓ 已删除留言');
+          loadComments();
+        } catch (e) { fail(e); }
+      };
+      btns.appendChild(del);
+      row.appendChild(btns);
+      box.appendChild(row);
+    });
+  } catch (e) {
+    st.textContent = '';
+    box.appendChild(makeEmpty()).textContent = '留言加载失败：' + e.message +
+      (/404|relation|42703|does not exist/i.test(e.message) ? ' —— comments 表未建：请先执行 docs/supabase-schema.sql 尾部「v1.6 留言板」升级 SQL' : '');
+  }
+}
+$('msgReload').onclick = () => loadComments();
+
 setChip();
 load();
+loadComments();
 </script>
 </body>
 </html>
