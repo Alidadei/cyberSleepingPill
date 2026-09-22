@@ -568,6 +568,8 @@
       position: fixed;
       inset: 0;
       background: rgb(var(--bg-rgb) / .55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       z-index: 70;
       display: flex;
       align-items: center;
@@ -583,7 +585,12 @@
       padding: 16px 18px;
       width: 100%;
       max-width: 480px;
-      max-height: 80vh
+      height: min(75vh, 640px);   /* 站主 2026-09-23：板做长一点，列表区撑满、视觉更稳 */
+      animation: msgboard-in .18s ease
+    }
+    @keyframes msgboard-in {
+      from { opacity: 0; transform: translateY(12px) }
+      to { opacity: 1; transform: none }
     }
     .msgboard-head {
       display: flex;
@@ -616,16 +623,19 @@
       margin-bottom: 4px
     }
     .msgboard-list {
+      flex: 1;
       overflow-y: auto;
-      min-height: 56px;
+      min-height: 120px;
       margin: 10px 0
     }
     .msgboard-item {
       padding: 8px 12px;
       border: 1px solid var(--line);
       border-radius: 10px;
-      margin-bottom: 8px
+      margin-bottom: 8px;
+      transition: border-color .2s
     }
+    .msgboard-item:hover { border-color: var(--grey) }
     .msgboard-body {
       font-size: 14px;
       color: var(--ink);
@@ -658,6 +668,7 @@
       border-radius: 10px;
       padding: 8px 12px
     }
+    .msgboard-input:focus { outline: none; border-color: var(--grey) }
     .msgboard-post {
       flex-shrink: 0;
       font: inherit;
@@ -2387,7 +2398,7 @@
         postBtn.disabled = false;
       };
       loadList();
-      if (input.focus) try { input.focus(); } catch (e) { }
+      /* 不自动聚焦输入框（站主 2026-09-23）：手机上弹键盘会把整块板顶出屏外，让用户自己点 */
     }
 
     /* ================= 渲染 ================= */
@@ -3132,7 +3143,7 @@
         label_url: '链接', ph_url: 'https:// …（B站分享文本直接粘贴也行）',
         label_type: '适合哪类失眠的人（选填）',
         label_note: '推荐留言（选填）', ph_note: '例：兴奋睡不着，听这个半小时就困了（≤60字）',
-        msg_btn: '留言', msg_open: '打开内容', msg_ph: '说点什么…（≤200字）', msg_post: '发布',
+        msg_btn: '留言板', msg_open: '打开内容', msg_ph: '说点什么…（≤200字）', msg_post: '发布',
         msg_none: '还没有留言，来抢头柱', msg_fail: '失败了，请稍后再试',
         msg_cool: '发得太快啦，歇一会再留言', msg_mine: '我', msg_loading: '加载中…',
         opt_none: '不确定 / 通用', opt_anxiety: '焦虑型 · 思绪停不下来', opt_excitement: '兴奋型 · 大脑过电影', opt_physical: '生理型 · 浑身不得劲', opt_noise: '噪音干扰型 · 环境吵',
