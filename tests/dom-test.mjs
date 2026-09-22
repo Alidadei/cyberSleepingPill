@@ -1,16 +1,21 @@
 /* cyberSleepCommunity index.html 行为测试：Node + 最小 DOM 桩，无外部依赖。
  * 运行：node tests/dom-test.mjs
- * 覆盖：类型星图节点（默认收起、点选展开、无类型、自定义标签节点）/
- *       B站分享文本拆解 + 标题抓取 / 发布 / URL 去重 / AdGuard / 星星评分（真实+样例模拟）/
- *       ESC / 入场动画两段式 / 导入合并去重 / APP 同款徽章 / 排序契约 / 中英切换 / 红线扫描 */
+ * 覆盖：类型星图节点（默认收起、点选展开、无类型、自定义标签节点、同义词折叠）/
+ *       B站分享文本拆解 + 标题抓取 / 发布 / URL 去重 / 推荐留言 note / AdGuard / 星星评分 /
+ *       ESC / 入场动画两段式 / 导入合并去重 / 排序契约 / 中英切换 / 样例下线红线 / 红线扫描 */
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
+/* 样例下线红线（2026-09-23 站主指令：删除所有样例内容）：内置样例与示例评分零残留 */
+if (html.includes('BUILTIN') || html.includes('sampleRating') || html.includes('【样例】')) {
+  throw new Error('样例下线红线：index.html 残留 BUILTIN/sampleRating/【样例】');
+}
+
 /* HTML 结构冒烟：关键 id 必须在标记里恰好出现一次（防解析层删改——桩按 id 注册，看不出结构缺失）。
    navAbout 已注释隐藏（保留 id 字符串即视为结构完整，恢复取消注释即可） */
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','labelNote','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fNote','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
   const n = (html.match(new RegExp('id="' + id + '"', 'g')) || []).length;
   if (n !== 1) throw new Error('HTML 结构错误: id="' + id + '" 出现 ' + n + ' 次（应为 1 次）');
 }
@@ -136,8 +141,8 @@ class El {
 function makeEl(tag) { return new El(tag); }
 
 const registry = {};
-for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
-  registry[id] = makeEl(id === 'fTitle' || id === 'fUrl' || id === 'fType' || id === 'searchBox' ? 'input' : 'div');
+for (const id of ['list','loadMsg','brandTitle','subtitle','navLang','formTitle','labelTitle','labelUrl','labelType','labelNote','formHint','letterCaption','sisterApp','sisterName','introHint','navAbout','typeList','tagNodes','searchBox','fTitle','fUrl','fType','fNote','fSubmit','fMsg','ioMsg','navPublish','navFavs','favFileImport','formPanel','intro','introText','introSign','skyStars','letterBox','navLetter','hamburgerBtn','mainNav','rankingOverlay']) {
+  registry[id] = makeEl(id === 'fTitle' || id === 'fUrl' || id === 'fType' || id === 'fNote' || id === 'searchBox' ? 'input' : 'div');
   registry[id].id = id;
 }
 registry.searchBox.className = 'search';
@@ -206,7 +211,6 @@ function ok(cond, name, extra) {
   pass++; console.log('  ✓ ' + name);
 }
 const store = () => JSON.parse(storage.get('csc_community_picks') || '[]');
-const sampleStore = () => JSON.parse(storage.get('csc_sample_ratings') || '{}');
 const liveNodes = () => registry.tagNodes.querySelectorAll('.node');
 const clickNode = label => liveNodes().find(n => n.children[1].textContent === label).onclick();
 const ensureNode = label => { const n = liveNodes().find(x => x.children[1].textContent === label); n.onclick(); };
@@ -229,12 +233,10 @@ ok(/^#[0-9a-f]{6}$/i.test(cssVars['--bg'] || ''), '时辰主题脚本已写入 -
 ok(cssVars['--t'] !== undefined && !Number.isNaN(parseFloat(cssVars['--t'])), '昼夜渐变因子 --t 已就绪', cssVars['--t']);
 ok(cssVars['--accent-rgb'] && cssVars['--accent-rgb'].split(',').length === 3, 'accent RGB 三元组供透明度派生', cssVars['--accent-rgb']);
 
-/* ---------- 2. 点节点展开 + B站分享文本拆解 + 发布 ---------- */
+/* ---------- 2. 点节点展开（样例已下线 → 空态） + B站分享文本拆解 + 发布 ---------- */
 clickNode('噪音干扰型');
 ok(registry.rankingOverlay.classList.contains('open'), '点击节点打开排行榜覆盖层');
-ok(cards().length === 1 && cardTitle(cards()[0]).includes('雨声助眠 8 小时'), '点「噪音干扰型」展开样例卡', cards().length);
-ok(cards()[0].children[1].textContent.includes('★ 4.9 · 302 次评价'), '样例卡渲染示例评分', cards()[0].children[1].textContent);
-ok(cards()[0].querySelectorAll('.type')[0].textContent === '# 噪音干扰型', '类型标签 # 前缀无框样式');
+ok(cards().length === 0 && registry.rankingOverlay.textContent.includes('还没有社区推荐'), '样例下线后：空类型显示空态而非演示数据', cards().length);
 
 g('fTitle').value = '';
 g('fUrl').value = '【深海鲸鱼白噪音 · 循环三小时】 https://www.bilibili.com/video/BV1xx411c7mD?share_source=copy_web';
@@ -244,30 +246,49 @@ ok(g('fUrl').value === 'https://www.bilibili.com/video/BV1xx411c7mD?share_source
 const submitResult = await g('fSubmit').onclick().then(() => 'resolved').catch(e => 'THREW: ' + e.message);
 ok(submitResult === 'resolved' && g('fMsg').classList.contains('ok'), '发布成功反馈 ok 态', g('fMsg').textContent);
 ok(store().length === 1, '数据入库（契约字段）', store());
+ok(cards().length === 0, '未选类型的提交不进噪音榜（分型正确，见第 5 段无类型节点）', cards().length);
 
-/* ---------- 3. 同 URL 合并语义（社区重复 → recommendCount+1；内置精选不可合并） ---------- */
+/* ---------- 3. 同 URL 合并语义（社区重复 → recommendCount+1） ---------- */
 g('fTitle').value = '换个标题再发一次';
 g('fUrl').value = 'https://www.bilibili.com/video/BV1xx411c7mD?share_source=copy_web';
 await g('fSubmit').onclick();
 ok(g('fMsg').classList.contains('ok') && g('fMsg').textContent.includes('推荐次数 +1'), '同链接合并次数+1', g('fMsg').textContent);
 ok(store().length === 1 && store()[0].recommendCount === 2, '不重复入库，次数递增', store()[0].recommendCount);
-g('fTitle').value = '';
-g('fUrl').value = 'http://m.bilibili.com/search/?keyword=%E9%9B%A8%E5%A3%B0%E5%8A%A9%E7%9C%A08%E5%B0%8F%E6%97%B6';
+
+/* ---------- 3b. 推荐留言 note（契约 v1.3：随条目入库、卡片展示、一并过 AdGuard） ---------- */
+g('fTitle').value = '助眠播客第 1 期';
+g('fUrl').value = 'https://example.com/podcast-1';
+g('fNote').value = '兴奋睡不着，听这个半小时就困了';
 await g('fSubmit').onclick();
-ok(g('fMsg').classList.contains('bad') && g('fMsg').textContent.includes('与内置精选'), '与内置精选同链仍拦截（无法合并）', g('fMsg').textContent);
+ok(g('fMsg').classList.contains('ok'), '带留言发布成功');
+const noted = store().find(p => p.title.includes('助眠播客'));
+ok(noted && noted.note === '兴奋睡不着，听这个半小时就困了', '留言随条目入库', noted && noted.note);
+ok(g('fNote').value === '', '提交后留言框清空');
+ok(/id="fNote"[^>]*maxlength="60"/.test(html), '留言框 maxlength=60');
+clickNode('无类型');
+ok(cards().some(c => c.textContent.includes('「兴奋睡不着，听这个半小时就困了」')), '卡片以留言样式展示 note');
+/* 留言属用户生成内容：与标题/URL 一起过 AdGuard */
+g('fTitle').value = '正常标题';
+g('fUrl').value = 'https://example.com/ad-note';
+g('fNote').value = '加微信 abc12345 领福利';
+await g('fSubmit').onclick();
+ok(g('fMsg').classList.contains('bad'), '留言含联系方式被拦截');
+ok(!store().some(p => p.url === 'https://example.com/ad-note'), '被拦截留言不入库');
 
 /* ---------- 4. AdGuard 拦截 ---------- */
+g('fNote').value = '';   /* 3b 被拦截提交的留言不带入本段 */
 g('fTitle').value = '兼职刷单加微信 abc12345';
 g('fUrl').value = 'https://example.com/ads';
 await g('fSubmit').onclick();
 ok(g('fMsg').classList.contains('bad') && g('fMsg').textContent.startsWith('未发布：'), 'AdGuard 拦截广告内容', g('fMsg').textContent);
-ok(store().length === 1, '被拦截内容不入库');
+const beforeAd = store().length;
+ok(store().length === beforeAd, '被拦截内容不入库');
 
 /* ---------- 5. 无类型节点 + 星星评分（社区卡） ---------- */
 clickNode('无类型');
 await sleep(10);
-ok(cards().length === 1 && cardTitle(cards()[0]).includes('深海鲸鱼'), '「无类型」节点收录未分类推荐', cards().length);
-const whaleCard = cards()[0];
+ok(cards().length === 2, '「无类型」节点收录未分类推荐（鲸鱼 + 播客）', cards().length);
+const whaleCard = cards().find(c => cardTitle(c).includes('深海鲸鱼'));
 ok(whaleCard.children[1].textContent.includes('bilibili.com'), '暂无评分时显示来源域名', whaleCard.children[1].textContent);
 ok(whaleCard.children[1].textContent.includes('被推荐 2 次'), '合并后卡片显示推荐次数', whaleCard.children[1].textContent);
 const rateBtn = whaleCard.querySelectorAll('.rate')[0];
@@ -310,17 +331,27 @@ ok(cards()[0].children[1].textContent.includes('# 白噪音'), '卡片标签以 
 ok(cards()[0].children[1].textContent.includes('被推荐 1 次'), '单次推荐卡片也显示推荐次数（1 次）', cards()[0].children[1].textContent);
 clickNode('白噪音');   /* 收起 */
 
-/* ---------- 8. 样例评分模拟（并入示例聚合值） ---------- */
-clickNode('噪音干扰型');
-const noiseSampleCardUrl = cards()[0].children[0].children[1].href;   /* 噪音样例链接 */
-const noiseSampleCard = cards().find(c => cardTitle(c).includes('雨声助眠 8 小时'));
-noiseSampleCard.querySelectorAll('.rate')[0].onclick();
-const srow = noiseSampleCard.children[2];
-await srow.querySelectorAll('.star')[4].onclick();   /* 给 5 星 */
-ok(sampleStore()[urlKey(noiseSampleCardUrl)].join() === '5', '样例评分存独立本地键（不污染契约数据）');
-await sleep(1600);
-const noiseMeta = cards().find(c => cardTitle(c).includes('雨声助眠 8 小时')).children[1].textContent;
-ok(noiseMeta.includes('★ 4.9 · 303 次评价'), '样例评分并入示例聚合值（302→303 次）', noiseMeta);
+/* ---------- 8. 同义词归一化（站主 2026-09-23：「兴奋睡不着」=「兴奋型」） ---------- */
+g('fNote').value = '';   /* 3b 被拦截提交的留言不带入本段 */
+ok(sandbox.normType('兴奋睡不着') === 'excitement', 'normType：兴奋睡不着 → excitement');
+ok(sandbox.normalizeTag('兴奋睡不着') === 'excitement', 'normalizeTag：写入口径同义折叠为官方 key');
+ok(sandbox.normalizeTag('兴奋型') === 'excitement' && sandbox.normType('噪音干扰型') === 'noise', '官方标签与「××型」写法原样归位');
+ok(sandbox.normType('白噪音') === '白噪音' && sandbox.normType(null) === null, '未知标签保留为自定义 / 空值返回 null');
+/* 写入口径端到端：手打同义标签提交 → 入库即官方 key */
+g('fTitle').value = '史诗战争片解说 · 越看越困';
+g('fUrl').value = 'https://example.com/war-movie';
+g('fType').value = '兴奋睡不着';
+await g('fSubmit').onclick();
+ok(g('fMsg').classList.contains('ok') && store().some(p => p.type === 'excitement' && p.title.includes('战争片')), '手打「兴奋睡不着」入库为官方 excitement');
+/* 渲染口径端到端：云端存量自由文本 type 渲染时折叠，不再分裂同义节点 */
+storage.set('csc_community_picks', JSON.stringify([...store(), {
+  id: 1720000000009, title: '存量同义标签条目', url: 'https://example.com/legacy-tag',
+  type: '兴奋睡不着', ratings: [], addedAt: 1720000000009, recommendCount: 1
+}]));
+await sandbox.refresh();
+ok(!liveNodes().some(n => n.children[1].textContent === '兴奋睡不着'), '存量自由文本不再生成同义节点');
+ensureNode('兴奋型');
+ok(cards().some(c => cardTitle(c).includes('存量同义标签条目')), '存量同义条目归入官方「兴奋型」榜单');
 
 /* ---------- 9. 发布面板 ---------- */
 g('navPublish').onclick();
@@ -361,25 +392,26 @@ clickNode('噪音干扰型');
 docHandlers.keydown.forEach(fn => fn({ key: 'Escape' }));
 ok(!g('rankingOverlay').classList.contains('open') && !g('formPanel').classList.contains('open'), 'ESC 一并收起榜单/面板');
 
-/* ---------- 10. APP 同款徽章（社区数据与内置精选同链接）----------
-   原走文件导入路径播种，2026-09-17 导航 导出/导入 入口下线后改为直写本机库 + refresh() */
+/* ---------- 10. 播种两条社区噪音条目（样例已下线，供排序/双语/举报/站长判定段使用） ---------- */
 storage.set('csc_community_picks', JSON.stringify([...store(), {
-  id: 1720000000001, title: '雨声（与内置精选同款）',
-  url: 'https://m.bilibili.com/search?keyword=%E9%9B%A8%E5%A3%B0%E5%8A%A9%E7%9C%A08%E5%B0%8F%E6%97%B6',
-  type: 'noise', ratings: [4, 5], addedAt: 1720000000001, recommendCount: 1
+  id: 1720000000001, title: '雨声 · 社区精选',
+  url: 'https://example.com/rain-community',
+  type: 'noise', ratings: [5], addedAt: 1720000000001, recommendCount: 1
+}, {
+  id: 1720000000000, title: '海浪声 · 循环',
+  url: 'https://example.com/ocean-waves',
+  type: 'noise', ratings: [5, 5], addedAt: 1720000000000, recommendCount: 1
 }]));
 await sandbox.refresh();
 ensureNode('噪音干扰型');
-const twinCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
-ok(!!twinCard && twinCard.querySelectorAll('.twin').length === 1, '同款内容显示「APP 同款」徽章');
-ok(twinCard && twinCard.querySelectorAll('.twin')[0].textContent === 'APP 同款', '徽章文案');
+ok(cards().length === 2, '噪音型 2 条社区条目（样例已下线，全为真实数据）', cards().length);
 
 /* ---------- 11. 排序契约（噪音型内 + 纯函数） ---------- */
 ensureNode('噪音干扰型');
 const noiseTitles = cards().map(cardTitle);
 ok(JSON.stringify(noiseTitles) === JSON.stringify([
-  '【样例】雨声助眠 8 小时 · 雨打窗台',
-  '雨声（与内置精选同款）']), '同类型内按平均分降序（样例与真实内容同榜）', noiseTitles);
+  '海浪声 · 循环',
+  '雨声 · 社区精选']), '同分按评分数降序（5.0×2票 > 5.0×1票）', noiseTitles);
 ok(sortPicks([
   { title:'a', ratings:[4], addedAt:1 },
   { title:'b', ratings:[5], addedAt:2 },
@@ -401,7 +433,7 @@ ok(favBtn0.getAttribute('aria-label') === '收藏这条', '卡片带书签按钮
 favBtn0.onclick();
 ok(favBtn0.getAttribute('aria-pressed') === 'true' && JSON.parse(localStorage.getItem('csc_favorites')).length === 1, '点亮书签 → 写入 csc_favorites');
 g('navFavs').onclick();
-ok(g('rankingOverlay').className.includes('open') && cards().length === 1, '收藏页只显示收藏的 1 条（同链接样例+社区去重）');
+ok(g('rankingOverlay').className.includes('open') && cards().length === 1, '收藏页只显示收藏的 1 条');
 ok(g('rankingOverlay').textContent.includes('# 收藏'), '收藏页徽标显示 # 收藏');
 const favBtn1 = cards()[0].children[0].children[3];
 favBtn1.onclick();
@@ -462,15 +494,15 @@ ok(deadBody.pick_id === '1720000000001' && typeof deadBody.uid === 'string' && d
 /* 徽标渲染规则（2026-09-17 站主定稿）：多人报告 AND 机器验证，缺一不可 */
 sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'bot-linkcheck' }, { pick_id: 1720000000001, uid: 'userA' }];
 sandbox.showRankingPage('noise');
-const botOnlyCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+const botOnlyCard = cards().find(c => cardTitle(c).includes('雨声 · 社区精选'));
 ok(!!botOnlyCard && !botOnlyCard.classList.contains('stale') && botOnlyCard.querySelectorAll('.dead-tag').length === 0, '仅机器人判死、无多人报告 → 不置灰');
 sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }, { pick_id: 1720000000001, uid: 'userC' }];
 sandbox.showRankingPage('noise');
-const humanOnlyCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+const humanOnlyCard = cards().find(c => cardTitle(c).includes('雨声 · 社区精选'));
 ok(!!humanOnlyCard && !humanOnlyCard.classList.contains('stale') && humanOnlyCard.querySelectorAll('.dead-tag').length === 0, '3 台设备人工举报但无机器验证 → 不置灰');
 sandbox.deadReports = [{ pick_id: 1720000000001, uid: 'bot-linkcheck' }, { pick_id: 1720000000001, uid: 'userA' }, { pick_id: 1720000000001, uid: 'userB' }];
 sandbox.showRankingPage('noise');
-const confirmedCard = cards().find(c => cardTitle(c).includes('雨声（与内置精选同款）'));
+const confirmedCard = cards().find(c => cardTitle(c).includes('雨声 · 社区精选'));
 ok(!!confirmedCard && confirmedCard.classList.contains('stale') && confirmedCard.querySelectorAll('.dead-tag')[0].textContent.includes('多人报告 + 机器验证'), '多人报告 + 机器验证 → 置灰 + 双确认徽标');
 sandbox.deadReports = [];
 /* 确认浮窗：点击 ⚠ → 弹出说明浮窗 → 确认才上报 → 成功自动关闭；取消直接关 */
@@ -506,6 +538,38 @@ ok(!!aliveCard && !aliveCard.classList.contains('stale') && aliveCard.querySelec
 const adminDeadCard = cards().find(c => cardTitle(c).includes('站长判死'));
 ok(!!adminDeadCard && adminDeadCard.classList.contains('stale') && adminDeadCard.querySelectorAll('.dead-tag')[0].textContent.includes('站长核实'), '站长判死 → 无需机器人/多人直接置灰 + 「站长核实」徽标');
 sandbox.deadReports = [];
+/* ---------- 12f. Supabase note：载荷带留言 + v1.5 DDL 未执行时自动降级 + load 映射 ---------- */
+let addCalls = [];
+const posts = () => addCalls.filter(c => c.method === 'POST');
+sandbox.fetch = async (url, opts) => {
+  const method = (opts && opts.method) || 'GET';
+  addCalls.push({ url: String(url), method, body: opts && opts.body });
+  if (method === 'POST' && posts().length === 1) return { ok: false, status: 400, json: async () => ({ code: 'PGRST204', message: 'column note does not exist' }) };
+  return { ok: method === 'GET' ? true : true, status: method === 'GET' ? 200 : 201, json: async () => [] };
+};
+await sandbox.SupabaseStore.add('留言条目', 'https://example.com/n1', 'noise', '太吵睡不着，戴上就静了');
+ok(posts()[0] && posts()[0].url.includes('community_picks'), 'add POST 到云端 community_picks');
+ok(JSON.parse(posts()[0].body).note === '太吵睡不着，戴上就静了', '首插载荷带 note 字段', posts()[0].body);
+ok(posts().length === 2 && JSON.parse(posts()[1].body).note === undefined && JSON.parse(posts()[1].body).title === '留言条目', 'note 列缺失（400）→ 自动降级无留言重试，推荐本体不失败', posts().length);
+/* 正常路径：列已建（DDL 已跑）→ 单次插入；无留言时载荷不含 note 键 */
+addCalls = [];
+sandbox.fetch = async (url, opts) => {
+  const method = (opts && opts.method) || 'GET';
+  addCalls.push({ url: String(url), method, body: opts && opts.body });
+  return { ok: true, status: method === 'GET' ? 200 : 201, json: async () => [] };
+};
+await sandbox.SupabaseStore.add('留言条目2', 'https://example.com/n2', null, null);
+ok(posts().length === 1 && JSON.parse(posts()[0].body).note === undefined, '无留言时载荷不含 note 键');
+/* load：select=* 带回 note → 映射进契约字段 */
+sandbox.fetch = async (url) => {
+  if (String(url).includes('community_picks?select=')) {
+    return { ok: true, status: 200, json: async () => [{ id: 5, title: 'x', url: 'https://e.com/x', type: 'noise', ratings: [], addedAt: 1, recommend_count: 1, note: '好睡' }] };
+  }
+  return { ok: true, status: 200, json: async () => [] };
+};
+const loaded = await sandbox.SupabaseStore.load();
+ok(loaded[0].note === '好睡', 'load 映射云端 note 字段', loaded[0]);
+sandbox.fetch = () => Promise.reject(new Error('offline in tests'));
 /* ---------- 13. 入场动画两段式（重播路径） ---------- */
 sessionStore.delete('csc_intro_done');
 playIntro();
@@ -586,5 +650,6 @@ let statsCompiled = true;
 try { new Function(statsJs); } catch (e) { statsCompiled = e.message; }
 ok(statsCompiled === true, '/data 脚本语法编译通过（不执行）', statsCompiled);
 ok(statsHtml.includes('href="../adm/"') && statsHtml.includes('href="../"'), '/data 常驻导航：站长后台入口 + 返回主站');
+ok(statsHtml.includes('TYPE_SYNONYMS') && statsHtml.includes("'兴奋睡不着'") && statsHtml.includes('normType'), '/data 类型统计同义词折叠（兴奋睡不着→兴奋型，与主站同源）');
 
 console.log('\nALL PASS: ' + pass + ' assertions');

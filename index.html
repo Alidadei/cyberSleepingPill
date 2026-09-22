@@ -557,21 +557,14 @@
       margin-right: 8px
     }
 
-    .twin {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
+    /* 推荐留言（契约 v1.3 note）：推荐者一句话介绍，弱化色随卡展示 */
+    .pick-note {
+      font-size: 13px;
       color: var(--sub);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 0 8px;
-      margin-left: 8px;
-      vertical-align: baseline
-    }
-
-    .twin svg {
-      flex-shrink: 0
+      margin-top: 6px;
+      line-height: 1.5;
+      text-align: center;
+      overflow-wrap: anywhere
     }
 
     /* 星星打分控件（全站图腾）：hover/focus 逐颗预览，点击即提交 */
@@ -1520,6 +1513,8 @@
         <input id="fUrl" placeholder="https:// …（B站分享文本直接粘贴也行）">
         <div class="label" id="labelType">适合哪类失眠的人（选填）</div>
         <input id="fType" list="typeList" placeholder="例如：白噪音、ASMR（选填，可自定义标签）" maxlength="12">
+        <div class="label" id="labelNote">推荐留言（选填）</div>
+        <input id="fNote" placeholder="例：兴奋睡不着，听这个半小时就困了" maxlength="60">
         <datalist id="typeList"></datalist>
         <button class="btn" id="fSubmit">提交推荐</button>
         <div class="msg" id="fMsg" aria-live="polite"></div>
@@ -1552,10 +1547,11 @@
   </div>
 
   <script>
-    /* ================= 数据契约 v1（docs/DATA_CONTRACT.md） =================
-     * CommunityPick = { id:number, title:string, url:string, type:string|null,
-     *                   ratings:number[], addedAt:number }
+    /* ================= 数据契约 v1.3（docs/DATA_CONTRACT.md） =================
+     * CommunityPick = { id:number, title:string, url:string, type:string|null, note:string|null,
+     *                   ratings:number[], addedAt:number, recommendCount:number }
      * 网站端与 APP 端（RelaxStore.kt / Gson）字段完全一致，禁止改名。
+     * note 为 v1.3 新增选填字段（推荐留言，≤60 字，提交过 AdGuard）；同义标签折叠见 normType。
      * ================================================================ */
 
     const TYPES = [
@@ -1565,8 +1561,7 @@
       { key: 'noise', label: '噪音干扰型' }
     ];
     const KEY = 'csc_community_picks';
-    const SKEY = 'csc_sample_ratings';
-    const FAVKEY = 'csc_favorites';   /* 收藏：本机 urlKey 列表（样例与社区通用），与契约数据无关 */
+    const FAVKEY = 'csc_favorites';   /* 收藏：本机 urlKey 列表（社区条目通用），与契约数据无关 */
     const PKEY = 'csc_profile';   /* 匿名画像：{ uid, nickname, age, gender, education } 全部选填 */
     const UKEY = 'csc_uid';       /* 匿名设备标识：首次生成后固定，用于画像 upsert */
 
@@ -1580,14 +1575,8 @@
 
     /* 分享卡片/canonical 已静态写在 <head>（不执行 JS 的爬虫读不到动态注入），此处不再注入 */
 
-    /* ---- 内置精选：与 APP assets/relax_picks.json 同步（每型一条样例+示例评分，
-       真实用户评分接入后用聚合值替换 sampleRatingAvg/sampleRatingCount） ---- */
-    const BUILTIN = [
-      { title: '呼吸放松 4-7-8 · 焦虑平复引导', url: 'https://m.bilibili.com/search?keyword=478%E5%91%BC%E5%90%B8%E6%94%BE%E6%9D%BE%E5%8A%A9%E7%9C%A0', type: 'anxiety', sample: true, sampleRatingAvg: 4.7, sampleRatingCount: 215 },
-      { title: '世界通史有声书 · 越听越困系列', url: 'https://m.bilibili.com/search?keyword=%E4%B8%96%E7%95%8C%E9%80%9A%E5%8F%B2%E6%9C%89%E5%A3%B0%E4%B9%A6', type: 'excitement', sample: true, sampleRatingAvg: 4.6, sampleRatingCount: 178 },
-      { title: '渐进式肌肉放松 · 从脚到眉引导', url: 'https://m.bilibili.com/search?keyword=%E6%B8%90%E8%BF%9B%E5%BC%8F%E8%82%8C%E8%82%89%E6%94%BE%E6%9D%BE%E5%BC%95%E5%AF%BC', type: 'physical', sample: true, sampleRatingAvg: 4.8, sampleRatingCount: 156 },
-      { title: '雨声助眠 8 小时 · 雨打窗台', url: 'https://m.bilibili.com/search?keyword=%E9%9B%A8%E5%A3%B0%E5%8A%A9%E7%9C%A08%E5%B0%8F%E6%97%B6', type: 'noise', sample: true, sampleRatingAvg: 4.9, sampleRatingCount: 302 }
-    ];
+    /* 内置精选样例与示例评分已于 2026-09-23 按站主指令整体下线：
+       站内只展示真实社区条目，冷启动靠真实推荐累积（勿恢复假数据） */
 
     /* ================= AdGuard（词表来源 docs/adguard-rules.json，与 APP AdGuard.kt 同步） ================= */
     const ADGUARD = (() => {
@@ -1619,7 +1608,7 @@
       async save(picks) {
         localStorage.setItem(KEY, JSON.stringify(picks));
       },
-      async add(title, url, type) {
+      async add(title, url, type, note) {
         const picks = await this.load();
         const dup = picks.find(p => urlKey(p.url) === urlKey(url));
         if (dup) {
@@ -1627,7 +1616,7 @@
           await this.save(picks);
           return { merged: true, count: dup.recommendCount };
         }
-        picks.push({ id: Date.now(), title, url, type: type || null, ratings: [], addedAt: Date.now(), recommendCount: 1 });
+        picks.push({ id: Date.now(), title, url, type: type || null, note: note || null, ratings: [], addedAt: Date.now(), recommendCount: 1 });
         await this.save(picks);
         return { merged: false, count: 1 };
       },
@@ -1681,6 +1670,7 @@
           delete o.recommend_count;
           o.adminVerdict = o.admin_verdict || null;   /* 站长人工判定（/adm 后台写入，anon 不可写） */
           delete o.admin_verdict;
+          o.note = o.note || null;   /* 推荐留言（契约 v1.3）；列未建（v1.5 DDL 未跑）时天然为 null */
           return o;
         });
       },
@@ -1694,8 +1684,8 @@
         });
         if (!r.ok) throw new Error('save ' + r.status);
       },
-      async add(title, url, type) {
-        /* 同 URL 合并语义（契约 §1 §6）：命中已存在行 → recommend_count+1（保留首条标题/类型），否则新插入 */
+      async add(title, url, type, note) {
+        /* 同 URL 合并语义（契约 §1 §6）：命中已存在行 → recommend_count+1（保留首条标题/类型/留言），否则新插入 */
         const q = await fetch(this.rest('community_picks?url=eq.' + encodeURIComponent(url) + '&select=id,recommend_count'), { headers: await this.headers() });
         if (!q.ok) throw new Error('add query ' + q.status);
         const rows = await q.json();
@@ -1707,7 +1697,13 @@
           return { merged: true, count: (rows[0].recommend_count || 1) + 1 };
         }
         const row = { id: Date.now(), title, url, type: type || null, ratings: [], addedAt: Date.now(), recommend_count: 1 };
-        const r = await fetch(this.rest('community_picks'), { method: 'POST', headers: await this.headers(), body: JSON.stringify(row) });
+        if (note) row.note = String(note).slice(0, 60);
+        let r = await fetch(this.rest('community_picks'), { method: 'POST', headers: await this.headers(), body: JSON.stringify(row) });
+        if (!r.ok && row.note) {
+          /* note 列未建/未授权（schema v1.5 DDL 未执行）→ 降级为无留言入库，推荐本体不失败 */
+          delete row.note;
+          r = await fetch(this.rest('community_picks'), { method: 'POST', headers: await this.headers(), body: JSON.stringify(row) });
+        }
         if (!r.ok) throw new Error('add ' + r.status);
         return { merged: false, count: 1 };
       },
@@ -1875,12 +1871,34 @@
       job.then(t => onResult(t)).catch(() => onResult(null));
     }
     function typeLabel(key) { const b = TYPES.find(x => x.key === key); return b ? t('type_' + key) : (key || ''); }
-    /* 类型标签可添加：内置四类归一为 key，自定义标签原样入库（≤12 字，会一并过 AdGuard） */
+    /* 同义词归一（站主 2026-09-23）：自定义标签凡与官方四类同义的折叠为官方 key，
+       如「兴奋睡不着」→ excitement（兴奋型）——写入口径 normalizeTag 与渲染口径 normType 共用此表，
+       存量数据（历史自由文本 type）渲染时同样折叠，节点/榜单/搜索/统计不会再分裂出同义节点 */
+    const TYPE_SYNONYMS = {
+      anxiety: ['焦虑睡不着', '焦虑', '心烦', '心烦睡不着', '想太多', '胡思乱想', '思绪停不下来'],
+      excitement: ['兴奋睡不着', '兴奋', '太兴奋', '激动', '激动睡不着', '大脑兴奋', '大脑停不下来', '大脑过电影'],
+      physical: ['生理睡不着', '生理', '身体', '身体不舒服', '身体睡不着', '浑身难受', '浑身不得劲'],
+      noise: ['噪音睡不着', '太吵睡不着', '太吵', '吵得睡不着', '环境吵', '声音吵']
+    };
+    function synonymKey(s) {
+      for (const x of TYPES) if ((TYPE_SYNONYMS[x.key] || []).some(v => s === v || s === v + '型')) return x.key;
+      return null;
+    }
+    /* 类型标签可添加：内置四类归一为 key，同义自定义标签折叠为官方 key，全新标签原样入库（≤12 字，会一并过 AdGuard） */
     function normalizeTag(v) {
       v = (v || '').trim().slice(0, 12);
       if (!v) return null;
-      const b = TYPES.find(x => x.key === v || t('type_' + x.key) === v);
-      return b ? b.key : v;
+      const b = TYPES.find(x => x.key === v || t('type_' + x.key) === v || x.label === v);
+      return b ? b.key : (synonymKey(v) || v);
+    }
+    /* 渲染口径：对已入库的历史 type 值做同样折叠（不截断长度，云端存量可能是任意自由文本） */
+    function normType(tp) {
+      if (tp == null || tp === '') return null;
+      const s = String(tp).trim();
+      if (!s) return null;
+      if (TYPES.some(x => x.key === s)) return s;
+      const b = TYPES.find(x => x.key === s || t('type_' + x.key) === s || x.label === s);
+      return b ? b.key : (synonymKey(s) || s);
     }
     function renderTypeList() {
       const dl = document.getElementById('typeList');
@@ -1888,14 +1906,12 @@
       dl.innerHTML = '';
       TYPES.forEach(x => { const o = document.createElement('option'); o.value = t('type_' + x.key); dl.appendChild(o); });
     }
-    /* 排序契约 §3：平均分降序 → 评分数降序 → addedAt 降序。
-       内置样例用示例评分（sampleRatingAvg/Count）参与同榜排序，真实数据接入后自然被顶下去 */
+    /* 排序契约 §3：平均分降序 → 评分数降序 → addedAt 降序 */
     function avgOf(p) {
-      if (Array.isArray(p.ratings)) return p.ratings.length ? p.ratings.reduce((x, y) => x + y, 0) / p.ratings.length : -1;
-      return p.sampleRatingAvg != null ? p.sampleRatingAvg : -1;
+      return Array.isArray(p.ratings) && p.ratings.length ? p.ratings.reduce((x, y) => x + y, 0) / p.ratings.length : -1;
     }
     function countOf(p) {
-      return Array.isArray(p.ratings) ? p.ratings.length : (p.sampleRatingCount || 0);
+      return Array.isArray(p.ratings) ? p.ratings.length : 0;
     }
     function sortPicks(items) {
       return items.slice().sort((a, b) =>
@@ -1903,27 +1919,6 @@
     }
     /* coercePick（契约文件导入合规化）已随导航 导出/导入 入口一同下线（2026-09-17 站主决定：
        社区数据以云端为唯一通道，站长直接读云端；文件格式保留在契约 §5 供 APP 互通） */
-    function findDup(url) {
-      const k = urlKey(url);
-      return BUILTIN.find(p => urlKey(p.url) === k)
-        || allPicks.find(p => urlKey(p.url) === k)
-        || null;
-    }
-    /* 样例打分模拟：存独立本地键，与契约数据（csc_community_picks）互不污染 */
-    function sampleRatings() {
-      try {
-        const o = JSON.parse(localStorage.getItem(SKEY));
-        return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
-      } catch (e) { return {}; }
-    }
-    function addSampleRating(url, score) {
-      const o = sampleRatings();
-      const k = urlKey(url);
-      const arr = Array.isArray(o[k]) ? o[k] : [];
-      arr.push(score);
-      o[k] = arr.slice(-50);
-      localStorage.setItem(SKEY, JSON.stringify(o));
-    }
     /* 收藏：本机 csc_favorites 存 {key,title,url,type} 列表（key=urlKey；旧版纯字符串条目读取时自动迁移）。
        站外导入的收藏（站内暂无对应内容）也保留原 title/url——收藏页直接成卡、导出原样带回。与契约数据无关 */
     function favMap() {
@@ -1952,14 +1947,9 @@
     function buildFavsExport() {
       const m = favMap();
       const byUrl = new Map();
-      [
-        ...BUILTIN.map(b => ({ title: b.title, url: b.url, type: b.type, sample: true })),
-        ...allPicks.map(p => ({ title: p.title, url: p.url, type: p.type, sample: false }))
-      ].forEach(p => {
+      allPicks.forEach(p => {
         const k = urlKey(p.url);
-        if (!m.has(k)) return;
-        const cur = byUrl.get(k);
-        if (!cur || (cur.sample && !p.sample)) byUrl.set(k, p);   /* 同一链接：社区条目优先于样例 */
+        if (m.has(k)) byUrl.set(k, { title: p.title, url: p.url, type: p.type });
       });
       return [...m.values()].map((meta, i) => {
         const p = byUrl.get(urlKey(meta.url));
@@ -1991,27 +1981,6 @@
       p.setAttribute('d', STAR_PATH);
       svg.appendChild(p);
       return svg;
-    }
-    function twinBadge() {
-      /* P2「APP ↔ 网站同款」标识：交接文档原案为 🤝，按审美规范 12.8 第 4 条
-         （emoji 仅品牌位一颗）改用内联 SVG 链条图标 + 文案 */
-      const ns = 'http://www.w3.org/2000/svg';
-      const span = document.createElement('span');
-      span.className = 'twin';
-      span.title = t('in_app_title');
-      const svg = document.createElementNS(ns, 'svg');
-      svg.setAttribute('viewBox', '0 0 24 24');
-      svg.setAttribute('width', '12'); svg.setAttribute('height', '12');
-      svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
-      svg.setAttribute('stroke-width', '2'); svg.setAttribute('stroke-linecap', 'round');
-      const p1 = document.createElementNS(ns, 'path');
-      p1.setAttribute('d', 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71');
-      const p2 = document.createElementNS(ns, 'path');
-      p2.setAttribute('d', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71');
-      svg.appendChild(p1); svg.appendChild(p2);
-      span.appendChild(svg);
-      span.appendChild(document.createTextNode(t('in_app')));
-      return span;
     }
     function magnifierSvg() {
       const ns = 'http://www.w3.org/2000/svg';
@@ -2182,7 +2151,7 @@
       const box = document.getElementById('tagNodes');
       if (!box) return;
       box.innerHTML = '';
-      const customs = [...new Set(allPicks.map(p => p.type).filter(tp => tp && !TYPES.some(x => x.key === tp)))];
+      const customs = [...new Set(allPicks.map(p => normType(p.type)).filter(tp => tp && !TYPES.some(x => x.key === tp)))];
       const defs = [['all', t('chip_all')], ...TYPES.map(tp => [tp.key, t('type_' + tp.key)]), ...customs.map(ct => [ct, ct]), ['none', t('type_none')]];
       defs.forEach((d, i) => {
         const key = d[0], label = d[1];
@@ -2408,42 +2377,28 @@
       overlay.appendChild(listContainer);
       function renderRankingList(query) {
         listContainer.innerHTML = '';
-        const pool = [
-          ...BUILTIN.map(b => {
-            const mine = (function () { try { const o = JSON.parse(localStorage.getItem(SKEY)); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch (e) { return {}; } })()[urlKey(b.url)] || [];
-            const count = b.sampleRatingCount + mine.length;
-            const avg = mine.length
-              ? (b.sampleRatingAvg * b.sampleRatingCount + mine.reduce((a, c) => a + c, 0)) / count
-              : b.sampleRatingAvg;
-            return { title: b.title, url: b.url, type: b.type, sample: true, sampleRatingAvg: avg, sampleRatingCount: count };
-          }),
-          ...allPicks
-        ];
+        const pool = allPicks;
         let items;
         if (typeKey === 'all') {
           items = sortPicks(pool);
         } else if (typeKey === 'favs') {
           const m = favMap();
           const byUrl = new Map();
-          pool.filter(p => m.has(urlKey(p.url))).forEach(p => {
-            const k = urlKey(p.url);
-            const cur = byUrl.get(k);
-            if (!cur || (cur.sample && !p.sample)) byUrl.set(k, p);   /* 同一链接：社区条目优先于样例 */
-          });
+          pool.filter(p => m.has(urlKey(p.url))).forEach(p => byUrl.set(urlKey(p.url), p));
           m.forEach((meta, k) => {   /* 池外收藏（含站外导入）也直接成卡 */
-            if (!byUrl.has(k)) byUrl.set(k, { title: meta.title || hostOf(meta.url), url: meta.url, type: meta.type, sample: false });
+            if (!byUrl.has(k)) byUrl.set(k, { title: meta.title || hostOf(meta.url), url: meta.url, type: meta.type });
           });
           items = sortPicks([...byUrl.values()]);
         } else if (typeKey === 'none') {
-          items = sortPicks(pool.filter(p => p.type == null || p.type === ''));
+          items = sortPicks(pool.filter(p => normType(p.type) == null));
         } else {
-          items = sortPicks(pool.filter(p => p.type === typeKey));
+          items = sortPicks(pool.filter(p => normType(p.type) === typeKey));
         }
         if (query) {
           const qL = query.toLowerCase();
           items = items.filter(p => {
             const title = (p.title || '').toLowerCase();
-            const tl = typeLabel(p.type).toLowerCase();
+            const tl = typeLabel(normType(p.type)).toLowerCase();
             return title.includes(qL) || tl.includes(qL);
           });
         }
@@ -2508,33 +2463,22 @@
       let score = 0;
       const title = (p.title || '').toLowerCase();
       if (title.includes(qL)) score += 3;
-      const tl = typeLabel(p.type).toLowerCase();
+      const tl = typeLabel(normType(p.type)).toLowerCase();
       if (tl && tl.includes(qL)) score += 2;
-      const rk = REASON_KEYS[p.type];
+      const rk = REASON_KEYS[normType(p.type)];
       if (rk && rk.some(k => k.includes(qL) || qL.includes(k))) score += 2;
       return score;
     }
     function cardFor(it, rank) {
-      return it.sample
-        ? card(it.title, it.url, it.type, null, false, it, rank)
-        : card(it.title, it.url, it.type, it, true, null, rank);
+      /* 池外收藏（无 id）仅展示：不可评分/举报/推荐次数 */
+      const pick = it && it.id != null ? it : null;
+      return card(it.title, it.url, it.type, pick, true, rank);
     }
     function renderList() {
       const list = document.getElementById('list');
       [...list.querySelectorAll('.card, .empty')].forEach(n => n.remove());
       const q = (searchQ || '').trim().toLowerCase();
-      const userSample = sampleRatings();   /* 访客对样例的模拟评分，并入示例聚合值 */
-      const pool = [
-        ...BUILTIN.map(b => {
-          const mine = userSample[urlKey(b.url)] || [];
-          const count = b.sampleRatingCount + mine.length;
-          const avg = mine.length
-            ? (b.sampleRatingAvg * b.sampleRatingCount + mine.reduce((a, c) => a + c, 0)) / count
-            : b.sampleRatingAvg;
-          return { title: b.title, url: b.url, type: b.type, sample: true, sampleRatingAvg: avg, sampleRatingCount: count };
-        }),
-        ...allPicks
-      ];
+      const pool = allPicks;
       if (q) {
         const scored = pool.map(p => [searchScore(p, q), p]).filter(x => x[0] > 0)
           .sort((a, b) => b[0] - a[0] || avgOf(b[1]) - avgOf(a[1]));
@@ -2554,10 +2498,10 @@
       if (!currentType) {
         return;
       }
-      const typeOk = p => currentType === 'none' ? (p.type == null || p.type === '') : p.type === currentType;
+      const typeOk = p => normType(p.type) === currentType;
       const items = sortPicks(pool.filter(typeOk));
       items.forEach((p, i) => list.appendChild(cardFor(p, String(i + 1).padStart(2, '0'))));
-      if (!items.some(p => !p.sample)) {
+      if (!items.length) {
         const empty = document.createElement('div');
         empty.className = 'hint empty';
         empty.style.margin = '20px 0';
@@ -2566,7 +2510,7 @@
       }
     }
 
-    function card(title, url, type, pick, isCommunity, builtin, rank) {
+    function card(title, url, type, pick, isCommunity, rank) {
       const el = document.createElement('div');
       el.className = 'card';
 
@@ -2582,12 +2526,12 @@
       a.href = url;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      a.textContent = (builtin && builtin.sample ? t('sample_tag') : '') + title;
+      a.textContent = title;
       head.appendChild(a);
 
-      /* 可评分对象：社区条目走 Store，样例走本地模拟（样例评分并入示例聚合值） */
-      const subject = isCommunity && pick ? pick : (builtin ? { sample: true, url } : null);
-      const rateId = isCommunity && pick ? String(pick.id) : 's' + urlKey(url);
+      /* 可评分对象：社区条目走 Store；池外收藏（无 id）仅展示 */
+      const subject = isCommunity && pick ? pick : null;
+      const rateId = subject ? String(pick.id) : '';
       let starsRow = null;
       if (subject) {
         const rate = document.createElement('button');
@@ -2605,7 +2549,7 @@
         };
         head.appendChild(rate);
       }
-      /* 收藏书签：样例与社区通用；收藏页里取消收藏 → 卡片即时离场 */
+      /* 收藏书签：社区与池外收藏通用；收藏页里取消收藏 → 卡片即时离场 */
       const fk = urlKey(url);
       const favOn = favMap().has(fk);
       const fav = document.createElement('button');
@@ -2622,7 +2566,7 @@
         if (currentRankingType === 'favs') rerenderRanking();
       };
       head.appendChild(fav);
-      /* 链接失效举报：仅社区条目（样例/收藏无对应云端行）；有云端才提供 */
+      /* 链接失效举报：仅社区条目（池外收藏无对应云端行）；有云端才提供 */
       if (isCommunity && pick && Store.reportDead) {
         const dinfo = deadInfo(pick.id);
         const dead = document.createElement('button');
@@ -2645,10 +2589,11 @@
 
       const m = document.createElement('div');
       m.className = 'm';
-      if (type) {
+      const nt = normType(type);
+      if (nt) {
         const tag = document.createElement('span');
         tag.className = 'type';
-        tag.textContent = '# ' + typeLabel(type);
+        tag.textContent = '# ' + typeLabel(nt);
         m.appendChild(tag);
       }
       if (isCommunity && pick) {
@@ -2672,16 +2617,20 @@
           tag.textContent = di.admin === 'dead' ? t('dead_badge_admin') : t('dead_badge');
           m.appendChild(tag);
         }
-      } else if (builtin && builtin.sampleRatingAvg != null) {
-        m.appendChild(starMark());
-        m.appendChild(document.createTextNode(' ' + t('ratings')(builtin.sampleRatingAvg.toFixed(1), builtin.sampleRatingCount)));
       } else {
         m.appendChild(document.createTextNode(hostOf(url)));
       }
       el.appendChild(m);
 
+      /* 推荐留言（契约 v1.3 note）：推荐者的一句话介绍，随卡展示 */
+      if (isCommunity && pick && pick.note) {
+        const note = document.createElement('div');
+        note.className = 'pick-note';
+        note.textContent = '「' + pick.note + '」';
+        el.appendChild(note);
+      }
+
       if (subject) {
-        if (isCommunity && pick && BUILTIN.some(b => urlKey(b.url) === urlKey(url))) m.appendChild(twinBadge());
         starsRow = document.createElement('div');
         starsRow.className = 'stars';
         starsRow.id = 'stars-' + rateId;
@@ -2718,8 +2667,7 @@
       rowEl.innerHTML = '';
       rowEl.appendChild(done);
       try {
-        if (subject.sample) addSampleRating(subject.url, score);   /* 样例：本地模拟，并入示例聚合值 */
-        else await Store.rate(subject.id, score);
+        await Store.rate(subject.id, score);
         done.textContent = t('rated');
         openStarsEl = null;
         setTimeout(async () => { await refresh(); rerenderRanking(); }, 1500);   /* ✓ 停留 1.5s 再刷新，让排序自然归位 */
@@ -2758,20 +2706,19 @@
       const url = normalizeUrl(parsed.url || rawUrl);
       let title = document.getElementById('fTitle').value.trim();
       const type = normalizeTag(document.getElementById('fType').value);
+      const note = document.getElementById('fNote').value.trim().slice(0, 60);
 
       if (!isValidUrl(url)) { msg.classList.add('bad'); msg.textContent = t('invalid_url'); return; }
       try { if (!title) title = new URL(url).host + ' 的犯困内容'; } catch (e) { }
-      const verdict = ADGUARD.check(title + ' ' + url + ' ' + (type || ''));
+      const verdict = ADGUARD.check(title + ' ' + url + ' ' + (type || '') + ' ' + note);
       if (!verdict.ok) { msg.classList.add('bad'); msg.textContent = t(verdict.code)(verdict.param); return; }
-      const dup = findDup(url);
-      /* 内置精选不可合并（无社区行）：依旧提示已收录；社区重复提交 → Store.add 自动合并次数 */
-      if (dup && dup.sample) { msg.classList.add('bad'); msg.textContent = t('dup_builtin')(dup.title.slice(0, 24)); return; }
 
       try {
-        const res = await Store.add(title.slice(0, 80), url, type);
+        const res = await Store.add(title.slice(0, 80), url, type, note);
         document.getElementById('fTitle').value = '';
         document.getElementById('fUrl').value = '';
         document.getElementById('fType').value = '';
+        document.getElementById('fNote').value = '';
         msg.classList.add('ok');
         msg.textContent = res && res.merged ? t('merged_ok')(res.count) : t('prescribed');
         await refresh();
@@ -2886,19 +2833,18 @@
         label_title: '标题', ph_title: '例：雨声助眠 8 小时（留空可自动从链接抓取）',
         label_url: '链接', ph_url: 'https:// …（B站分享文本直接粘贴也行）',
         label_type: '适合哪类失眠的人（选填）',
+        label_note: '推荐留言（选填）', ph_note: '例：兴奋睡不着，听这个半小时就困了（≤60字）',
         opt_none: '不确定 / 通用', opt_anxiety: '焦虑型 · 思绪停不下来', opt_excitement: '兴奋型 · 大脑过电影', opt_physical: '生理型 · 浑身不得劲', opt_noise: '噪音干扰型 · 环境吵',
         submit: '提交推荐', form_hint: '含广告卖货 / 联系方式的内容会被直接拦下（与 APP 同一套 AdGuard 规则）',
         prescribed: '已发布 ✓ 感谢为同类型的失眠伙伴添砖加瓦', publish_fail: '发布失败，请稍后再试',
         invalid_url: '链接无效，请检查',
         dup: t24 => `这条已经在社区里了（${t24}），直接去给它打个分吧`,
-        dup_builtin: t24 => `与内置精选「${t24}」是同一内容，已收录——直接去给它打个分吧`,
         merged_ok: n => `已收录，推荐次数 +1（共被推荐 ${n} 次）`,
         rec_times: n => `被推荐 ${n} 次`,
         ad_contact: p => `未发布：疑似联系方式/短链：${p}`, ad_strong: k => `未发布：疑似推广关键词：${k}`, ad_weak: n => `未发布：广告特征过多（命中 ${n} 项）`,
         import_bad_json: 'JSON 解析失败',
         rate_cta: '评分 ☆', rated: '已评分 ✓', rate_fail: '评分失败，请稍后再试',
-        ratings: (a, n) => `${a} · ${n} 次评价`, sample_tag: '【样例】', in_app: 'APP 同款',
-        in_app_title: '这条在 APP「睡眠站台」里也有',
+        ratings: (a, n) => `${a} · ${n} 次评价`,
         stars_group: '为这条内容打分（1–5 星，5 = 最助眠）', star_n: n => `${n} 星`,
         profile_title: '完善画像（选填）',
         profile_hint: '仅作统计研究使用，推荐填写！',
@@ -2915,7 +2861,7 @@
         profile_save: '保存画像',
         profile_saved: s => '已保存 ✓' + (s ? '  ' + s : ''),
         profile_local_only: '已存本机（云端暂时不可用，稍后自动重试）',
-        empty_all: '以上【样例】仅为演示数据 · 社区还没有真实推荐，欢迎发布第一条',
+        empty_all: '社区还没有推荐，欢迎发布第一条（样例演示数据已于 2026-09-23 下线）',
         empty_type: '该类型还没有社区推荐，欢迎发布第一条',
         nav_about: '网站介绍', ph_type: '例如：白噪音、ASMR（选填，可自定义标签）',
         type_none: '无类型', pick_a_star: '点亮一颗星，展开对应的药方',
@@ -2954,19 +2900,18 @@
         label_title: 'Title', ph_title: 'e.g. Rain sounds for sleep (leave blank to auto-fetch the title)',
         label_url: 'Link', ph_url: 'https:// … (pasting a share text works too)',
         label_type: 'Who is it for? (optional)',
+        label_note: 'Note (optional)', ph_note: 'e.g. "Too excited to sleep — this knocks me out in 30 min" (≤60 chars)',
         opt_none: 'Not sure / General', opt_anxiety: 'Anxiety · racing mind', opt_excitement: 'Excitement · mind keeps replaying the day', opt_physical: 'Physical · body won\'t settle', opt_noise: 'Noise · the world is too loud',
         submit: 'Submit', form_hint: 'Ads and solicitation are filtered automatically (same rules as the Sleep Station app)',
         prescribed: 'Prescribed ✓ thanks for helping fellow sleepless souls', publish_fail: 'Failed to publish, please try again later',
         invalid_url: 'That link doesn\'t look right',
         dup: t24 => `Already in the collection ("${t24}") — go rate it instead`,
-        dup_builtin: t24 => `This is the built-in pick "${t24}" — already collected, go rate it instead`,
         merged_ok: n => `Noted, recommendation count +1 (${n} total)`,
         rec_times: n => `Recommended ${n}×`,
         ad_contact: p => `Not published: looks like contact info / short link: ${p}`, ad_strong: k => `Not published: looks like an ad: ${k}`, ad_weak: n => `Not published: too many ad cues (${n} hits)`,
         import_bad_json: 'Failed to parse JSON',
         rate_cta: 'Rate ☆', rated: 'Rated ✓', rate_fail: 'Rating failed, please try again later',
-        ratings: (a, n) => `${a} · ${n} ratings`, sample_tag: '[Sample] ', in_app: 'Also in app',
-        in_app_title: 'This one also exists in the Sleep Station app',
+        ratings: (a, n) => `${a} · ${n} ratings`,
         stars_group: 'Rate this 1–5 stars (5 = most sleep-inducing)', star_n: n => `${n} star${n > 1 ? 's' : ''}`,
         profile_title: 'Tell us about you (optional)',
         profile_hint: 'Anonymous statistics only — please fill in!',
@@ -2983,7 +2928,7 @@
         profile_save: 'Save',
         profile_saved: s => 'Saved ✓' + (s ? '  ' + s : ''),
         profile_local_only: 'Saved locally (cloud unavailable — will retry later)',
-        empty_all: 'The samples above are demo data · no real picks yet — feel free to add the first one',
+        empty_all: 'No community picks yet — be the first to add one',
         empty_type: 'No community picks for this type yet — be the first',
         nav_about: 'About', ph_type: 'e.g. white noise, ASMR (optional, custom tags allowed)',
         type_none: 'No type', pick_a_star: 'Light up a star to reveal its prescriptions',
@@ -3017,6 +2962,8 @@
       const lb = document.getElementById('navLang'); if (lb) lb.textContent = lang === 'zh' ? 'EN' : '中文';
       set('brandTitle', 'brand'); set('subtitle', 'subtitle');
       set('formTitle', 'form_title'); set('labelTitle', 'label_title'); set('labelUrl', 'label_url'); set('labelType', 'label_type');
+      set('labelNote', 'label_note');
+      const fnIn = document.getElementById('fNote'); if (fnIn) fnIn.placeholder = t('ph_note');
       set('fSubmit', 'submit'); set('formHint', 'form_hint');
       set('letterCaption', 'letter_caption'); set('navAbout', 'nav_about');
       const sBox = document.getElementById('searchBox'); if (sBox) sBox.placeholder = t('search_ph');

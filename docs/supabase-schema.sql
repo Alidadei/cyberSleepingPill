@@ -87,3 +87,15 @@ grant update (ratings, recommend_count) on community_picks to anon;
 
 revoke insert on community_picks from anon;
 grant insert (id, title, url, type, ratings, "addedAt", recommend_count) on community_picks to anon;
+
+-- ============================================================
+-- v1.5 推荐留言（2026-09-23，契约 v1.3）：note 选填，≤60 字
+--   提交时与标题/URL/标签一起过两端 AdGuard；同 URL 合并保留首条 note。
+--   网站端在 DDL 未执行时自动降级为无留言入库（推荐本体不失败）。
+-- ★ 站长操作：Dashboard → SQL Editor 粘贴下面整段 → Run（幂等，可与 v1.4 一起执行）
+-- ============================================================
+alter table community_picks
+  add column if not exists note text;
+
+revoke insert on community_picks from anon;
+grant insert (id, title, url, type, ratings, "addedAt", recommend_count, note) on community_picks to anon;

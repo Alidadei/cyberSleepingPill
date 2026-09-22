@@ -122,6 +122,27 @@ var AGE = { '60s': '60后', '70s': '70后', '80s': '80后', '90s': '90后', '00s
 var GENDER = { male: '男', female: '女', prefer_not: '保密' };
 var EDU = { bachelor: '本科', master: '硕士', phd: '博士', other: '其他', prefer_not: '保密' };
 var TYPE = { anxiety: '焦虑型', excitement: '兴奋型', physical: '生理型', noise: '噪音干扰型' };
+/* 同义词折叠（与 index.html TYPE_SYNONYMS 同源，站主 2026-09-23）：历史自由文本 type 归并进官方四类，
+   如「兴奋睡不着」→ excitement，类型分布不再分裂出同义条目 */
+var TYPE_SYNONYMS = {
+  anxiety: ['焦虑睡不着', '焦虑', '心烦', '心烦睡不着', '想太多', '胡思乱想', '思绪停不下来'],
+  excitement: ['兴奋睡不着', '兴奋', '太兴奋', '激动', '激动睡不着', '大脑兴奋', '大脑停不下来', '大脑过电影'],
+  physical: ['生理睡不着', '生理', '身体', '身体不舒服', '身体睡不着', '浑身难受', '浑身不得劲'],
+  noise: ['噪音睡不着', '太吵睡不着', '太吵', '吵得睡不着', '环境吵', '声音吵']
+};
+function normType(tp) {
+  if (tp == null || tp === '') return null;
+  var s = String(tp);
+  if (TYPE[s]) return s;
+  for (var k in TYPE) {
+    if (TYPE[k] === s || TYPE[k] === s + '型' || TYPE[k].replace(/型$/, '') === s) return k;
+  }
+  for (var k2 in TYPE_SYNONYMS) {
+    var syns = TYPE_SYNONYMS[k2];
+    if (syns.indexOf(s) !== -1 || (s.slice(-1) === '型' && syns.indexOf(s.slice(0, -1)) !== -1)) return k2;
+  }
+  return s;
+}
 
 function $(id) { return document.getElementById(id); }
 function note(s, bad) { var m = $('msg'); m.textContent = s; m.className = 'msg' + (bad ? ' bad' : ''); }
@@ -138,11 +159,12 @@ async function api(path) {
   return r.json();
 }
 
-function countBy(rows, field, map, missing) {
+function countBy(rows, field, map, missing, norm) {
   var miss = missing || 'prefer_not';
   var out = {};
   for (var i = 0; i < rows.length; i++) {
     var raw = rows[i][field] == null || rows[i][field] === '' ? miss : String(rows[i][field]);
+    if (norm) { var nv = norm(rows[i][field]); raw = nv == null ? miss : String(nv); }
     var label = (map && map[raw]) || raw;
     out[label] = (out[label] || 0) + 1;
   }
@@ -298,7 +320,7 @@ async function refreshAll() {
   /* ---- 推荐内容 ---- */
   var kw = $('pickWrap');
   kw.textContent = '';
-  kw.appendChild(distBlock('类型分布', countBy(picks, 'type', TYPE, '未分类'), 'b2'));
+  kw.appendChild(distBlock('类型分布', countBy(picks, 'type', TYPE, '未分类', normType), 'b2'));
   var rated = picks.filter(function (p) { return p.ratings && p.ratings.length; }).map(function (p) {
     var avg = p.ratings.reduce(function (a, b) { return a + b; }, 0) / p.ratings.length;
     return { t: p.title || '(无标题)', v: '★ ' + avg.toFixed(1) + ' · ' + p.ratings.length + ' 人' };
