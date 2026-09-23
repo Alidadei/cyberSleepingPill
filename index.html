@@ -629,6 +629,8 @@
     .msgboard-list {
       flex: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;   /* 滑到头不把滚动链给背后的榜单页 */
       min-height: 120px;
       margin: 10px 0
     }

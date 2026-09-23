@@ -574,6 +574,7 @@ ok(loaded[0].note === '好睡', 'load 映射云端 note 字段', loaded[0]);
 sandbox.fetch = () => Promise.reject(new Error('offline in tests'));
 /* ---------- 12g. 留言板（v1.6 comments：存取载荷 / 弹层 UI / AdGuard / 冷却 / 按钮门控） ---------- */
 ok(cards().every(c => c.querySelectorAll('.msgbtn').length === 0), '离线 LocalStore 模式不渲染留言按钮');
+ok(/\.msgboard-list \{[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain/s.test(html), '留言列表可滚动且滑到头不链给背后页面（overscroll-behavior: contain）');
 let commentCalls = [];
 const myUid = storage.get('csc_uid');
 sandbox.fetch = async (url, opts) => {
