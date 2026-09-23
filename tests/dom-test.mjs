@@ -423,15 +423,16 @@ g('navLang').onclick();
 ok(g('navPublish').textContent === 'Prescribe' && g('brandTitle').textContent === 'Cyber Sleeping Pills', '切换 EN：导航与品牌变英文', g('brandTitle').textContent);
 ok(liveNodes().some(n => n.children[1].textContent === 'Anxiety'), 'EN 下节点标签变英文');
 ok(cards().length === 2 && cards().every(c => c.children[1].textContent.includes('# Noise')), 'EN 下类型标签 # Noise（噪音型 2 张卡）', cards().length);
+ok(cards().every(c => c.children[0].children[3].textContent === 'Save'), 'EN 下收藏按钮带文字 Save');
 g('navLang').onclick();
 ok(g('navPublish').textContent === '推荐药方' && g('brandTitle').textContent === '电子安眠药', '切回中文：推荐药方 / 电子安眠药');
 
 /* ---------- 12b. 收藏（书签 + 收藏榜单页） ---------- */
 clickNode('噪音干扰型');
 const favBtn0 = cards()[0].children[0].children[3];
-ok(favBtn0.getAttribute('aria-label') === '收藏这条', '卡片带书签按钮（未收藏态）');
+ok(favBtn0.getAttribute('aria-label') === '收藏这条' && favBtn0.textContent === '收藏', '卡片带书签按钮（未收藏态，带「收藏」文字）');
 favBtn0.onclick();
-ok(favBtn0.getAttribute('aria-pressed') === 'true' && JSON.parse(localStorage.getItem('csc_favorites')).length === 1, '点亮书签 → 写入 csc_favorites');
+ok(favBtn0.getAttribute('aria-pressed') === 'true' && favBtn0.textContent === '已收藏' && JSON.parse(localStorage.getItem('csc_favorites')).length === 1, '点亮书签 → 写入 csc_favorites + 文字变「已收藏」');
 g('navFavs').onclick();
 ok(g('rankingOverlay').className.includes('open') && cards().length === 1, '收藏页只显示收藏的 1 条');
 ok(g('rankingOverlay').textContent.includes('# 收藏'), '收藏页徽标显示 # 收藏');
@@ -481,6 +482,7 @@ ok(exported.some(x => x.url === 'https://www.example.com/b/'), '导出保留原 
 
 /* ---------- 12d. 链接失效举报（Local 模式隐藏按钮；SupabaseStore 载荷与徽标渲染直测） ---------- */
 ok(cards().every(c => c.querySelectorAll('.dead').length === 0), 'Local 模式不渲染举报按钮');
+ok(html.includes("dead_btn: '失效反馈', dead_btn_done: '已反馈'") && html.includes("dead_btn: 'Dead link?', dead_btn_done: 'Reported'") && html.includes("t('dead_btn_done') : t('dead_btn')"), '失效按钮带文字标签（失效反馈/已反馈，中英双语，举报后切换）');
 ok(await sandbox.reportDeadLink('123') === 'offline', 'Local 模式 reportDeadLink 返回 offline');
 let capturedDead = null;
 sandbox.fetch = async (url, opts) => {

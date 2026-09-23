@@ -434,12 +434,14 @@
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
+      gap: 5px;
+      font-size: 13px;
       cursor: pointer;
       color: var(--grey);
       background: transparent;
       border: 1px solid var(--line);
       border-radius: 12px;
-      padding: 4px 9px;
+      padding: 2px 10px;
       font-family: inherit;
       transition: border-color .2s, color .2s
     }
@@ -459,12 +461,14 @@
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
+      gap: 5px;
+      font-size: 13px;
       cursor: pointer;
       color: var(--grey);
       background: transparent;
       border: 1px solid var(--line);
       border-radius: 12px;
-      padding: 4px 9px;
+      padding: 2px 10px;
       font-family: inherit;
       transition: border-color .2s, color .2s
     }
@@ -1035,6 +1039,19 @@
 
       .card .t {
         flex-basis: 100%
+      }
+
+      /* 按钮行四粒（评分/收藏/失效反馈/留言板）在窄屏挤一行：收紧内边距与间距（360px 实测 294≤304） */
+      .card .head {
+        gap: 5px
+      }
+
+      .card .rate,
+      .card .fav,
+      .card .dead,
+      .card .msgbtn {
+        padding-left: 8px;
+        padding-right: 8px
       }
 
       #list {
@@ -2852,11 +2869,15 @@
       fav.setAttribute('aria-pressed', String(favOn));
       fav.setAttribute('aria-label', favOn ? t('fav_remove') : t('fav_add'));
       fav.appendChild(bookmarkSvg());
+      const favTxt = document.createElement('span');
+      favTxt.textContent = favOn ? t('fav_btn_on') : t('fav_btn');
+      fav.appendChild(favTxt);
       fav.onclick = () => {
         const now = toggleFav(fk, { title, url, type: type || null });
         fav.classList.toggle('on', now);
         fav.setAttribute('aria-pressed', String(now));
         fav.setAttribute('aria-label', now ? t('fav_remove') : t('fav_add'));
+        favTxt.textContent = now ? t('fav_btn_on') : t('fav_btn');
         if (currentRankingType === 'favs') rerenderRanking();
       };
       head.appendChild(fav);
@@ -2869,12 +2890,16 @@
         dead.title = dinfo.me ? t('dead_reported') : t('dead_report_tip');
         dead.setAttribute('aria-label', dead.title);
         dead.appendChild(warnSvg());
+        const deadTxt = document.createElement('span');
+        deadTxt.textContent = dinfo.me ? t('dead_btn_done') : t('dead_btn');
+        dead.appendChild(deadTxt);
         dead.onclick = () => {
           if (dead.classList.contains('done')) return;
           openDeadDialog(pick.id, () => {
             dead.classList.add('done');
             dead.title = t('dead_reported');
             dead.setAttribute('aria-label', dead.title);
+            deadTxt.textContent = t('dead_btn_done');
           });
         };
         head.appendChild(dead);
@@ -3129,10 +3154,12 @@
         subtitle: '致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方',
         nav_prescribe: '推荐药方', nav_letter: '手书',
         nav_favs: '收藏', fav_add: '收藏这条', fav_remove: '取消收藏',
+        fav_btn: '收藏', fav_btn_on: '已收藏',
         favs_empty: '还没有收藏。点亮卡片右侧的书签，好内容就不会走丢',
         favs_export: '导出收藏', favs_import: '导入收藏',
         favs_import_ok: (a, s) => `已导入 ${a} 条收藏${s ? ` · 跳过 ${s} 条重复/无效` : ''}`, favs_import_bad: '文件格式不对（需要收藏数组，可从 APP「睡眠站台」收藏页导出）',
         dead_report_tip: '链接打不开？报告失效', dead_reported: '已收到反馈（重复只计一次）', dead_report_fail: '上报失败，请稍后再试',
+        dead_btn: '失效反馈', dead_btn_done: '已反馈',
         dead_dlg_title: '反馈链接失效', dead_dlg_body: '这条内容的链接打不开了？确认反馈记一票：同一内容累计 2 人以上报告，卡片会自动置灰提醒其他访客，站长定期清理。匿名提交，一人一票。', dead_dlg_confirm: '确认反馈', dead_dlg_cancel: '取消',
         dead_badge: '⚠ 多人报告 + 机器验证：链接可能已失效',
         dead_badge_admin: '⚠ 站长核实：链接已失效',
@@ -3199,10 +3226,12 @@
         subtitle: 'To the anxious insomniac scrolling in the dark: this is where scrolling finally puts you to sleep.',
         nav_prescribe: 'Prescribe', nav_letter: 'Letter',
         nav_favs: 'Saved', fav_add: 'Save this', fav_remove: 'Remove from saved',
+        fav_btn: 'Save', fav_btn_on: 'Saved',
         favs_empty: 'Nothing saved yet — tap the bookmark on a card to keep it for a late night',
         favs_export: 'Export saved', favs_import: 'Import saved',
         favs_import_ok: (a, s) => `Imported ${a} saved item(s)${s ? ` · skipped ${s} duplicate/invalid` : ''}`, favs_import_bad: 'Wrong format (expected a saved-items array, e.g. exported from the Sleep Station app)',
         dead_report_tip: 'Link dead? Report it', dead_reported: 'Feedback received (duplicates counted once)', dead_report_fail: 'Failed to report, try again later',
+        dead_btn: 'Dead link?', dead_btn_done: 'Reported',
         dead_dlg_title: 'Report a broken link', dead_dlg_body: 'Is this link dead? Confirm to cast one vote — once 2+ visitors report the same item, its card dims automatically to warn others. Anonymous, one vote per device.', dead_dlg_confirm: 'Confirm', dead_dlg_cancel: 'Cancel',
         dead_badge: '⚠ Multi-reported + machine-verified: link may be dead',
         dead_badge_admin: '⚠ Owner-verified: link is dead',

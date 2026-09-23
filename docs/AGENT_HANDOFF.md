@@ -1,7 +1,7 @@
 # AGENT_HANDOFF · 电子安眠药（cyberSleepingPill）开发接手指南
 
 > 写给下一个接手本项目的 AI agent。读完这一篇即可开工，不需要问用户任何背景问题。
-> 最后更新：2026-09-23（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
+> 最后更新：2026-09-24（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
 
 ## 0. 一句话定位
 
@@ -15,7 +15,7 @@
 ```bash
 # ① 语法：抽出内联 <script> 做语法检查
 awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html > /tmp/s.js && node --check /tmp/s.js
-# ② 行为回归：零依赖 DOM 桩测试（当前 168 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线）
+# ② 行为回归：零依赖 DOM 桩测试（当前 170 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线）
 node tests/dom-test.mjs
 # ③ 本地预览（后台常驻；跨会话可能被回收，用前先 curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8642/ 探活）
 python -m http.server 8642 --bind 127.0.0.1
@@ -43,7 +43,7 @@ cyberSleepCommunity/
 ├── index.html                  # 单文件站全部 HTML/CSS/JS（当前 ~3000 行）
 ├── adm/index.html              # 站长后台：人工判活/判死/清举报/删条目 + 留言审核（noindex，永不内嵌密钥）
 ├── data/index.html             # 数据页：画像/推荐/链接健康统计，密钥门禁 + 30 秒自刷（noindex）
-├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 168 项断言，含 admin/样例下线红线扫描）
+├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 170 项断言，含 admin/样例下线红线扫描）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
 ├── .github/workflows/link-check.yml
 ├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / capacity-test / 本文件
@@ -102,13 +102,14 @@ cyberSleepCommunity/
 - **站长后台 /adm（2026-09-19）**：报警升级为**三层规则**——站长判活（`admin_verdict='alive'`）永久压过机器人与一切举报、站长判死直接报警（无需双确认，徽标文案「⚠ 站长核实：链接已失效」）、无判定才走自动双确认；巡检机器人跳过已判定条目（人工裁决优先）。后台公开可访问但只读，管理操作需运行时粘贴 service_role（铁律见 §3.8）；anon 授权收缩为列级（update 仅 ratings/recommend_count，判定列 service_role 专属，见 schema v1.4）——这次收紧顺手堵了旧档案里「anon 可覆盖任意列」的已知限制。顶部常驻导航（数据页入口 + 返回主站）。**配色 = 暖白简化调色板**（站主指定采用 `/research-html` 色板：奶油底 #faf8f5 + 暖棕 #8d6e63，红 #b05050 仅危险语义），有意区别于主站深色星空，别"统一"回去
 - **数据页 /data（2026-09-19）**：密钥门禁（同 /adm，service_role 运行时粘贴仅内存，进入前不渲染任何数据）；顶部常驻导航（站长后台入口 + 返回主站）；总览/用户画像/推荐内容/链接健康四区，进入后每 30 秒自动刷新；纯客户端聚合（三表全量拉取 limit 2000/5000，规模大后应改 PostgREST 聚合或视图）；画像标签映射与站内 `AGE_GROUP_KEYS/GENDER_KEYS/EDU_KEYS` 一致（未知值原样显示）；报警口径与主站三层规则同源（含 admin_verdict）；配色同 /adm 暖白简化；noindex + robots Disallow + 主站无入口
 - **样例整体下线 + 同义词折叠 + 推荐留言（2026-09-23，站主三项指令，契约 v1.3 / schema v1.5）**：① 内置精选样例（BUILTIN 四条+示例评分+csc_sample_ratings+「APP 同款」徽章+【样例】前缀）**全部删除**——推翻 2026-09-10「每型一条样例」决定，站内只剩真实社区条目，空类型显示空态引导；测试有「无 BUILTIN/sampleRating/【样例】残留」红线，勿恢复。② 自定义标签**同义词折叠**（`TYPE_SYNONYMS` + `normType`）：写入口径（normalizeTag）与渲染口径共用一表，「兴奋睡不着」→`excitement`（站主云端真实数据里的首例同义分裂）；`/data` 数据页同源一份，类型分布不再分裂；无法归类的自由标签仍按 v1.1 原样保留。同义词表**有意不追求穷举、也绝不在运行时集成任何语义模型/API**（站主 2026-09-23：语义判定由维护 agent 离线做、模型不写死，常备流程见 §4.9）。③ 新增**推荐留言 note**（契约 v1.3 选填字段）：提交框 maxlength=60、与标题/URL/标签一起过 AdGuard、卡片「留言」居中样式展示、同 URL 合并保留首条；云端列 `note`（schema v1.5，列级 insert 授权已含），**DDL 未执行时 add 自动降级为无留言重试**（推荐本体不失败）；APP 端 Gson 容忍缺失，代码零改动。CDP 截图抓过一次 note 靠左不居中的视觉问题——卡片内容全是居中风格，新块级元素记得 `text-align:center`。同日站主手机端反馈：长标题换行时序号被 `.head` 的 `justify-content:center` 挤成独占一行居中、与短标题卡不一致 → **≤640px 断点内 .card .head 改 `flex-start` + rank 加 min-width 2.2em**；同日二轮拍板：**标题独占一行（.t flex-basis:100%），评分/收藏/举报三按钮恒同一行**（移动端排行卡统一为「序号→标题→按钮行→居中 meta→留言」结构，桌面端居中审美不变，勿"统一"回桌面）。
+- **卡片按钮全部带文字（2026-09-24，站主指令「收藏 和 网址失效反馈 两个按钮也需要文字提示」）**：收藏/失效按钮从纯图标改为「图标+文字」胶囊（收藏→已收藏、失效反馈→已反馈，EN Save→Saved、Dead link?→Reported），与 评分☆/留言板 统一 13px 胶囊族；i18n 新键 `fav_btn/fav_btn_on/dead_btn/dead_btn_done`（aria-label 仍用全文案 `fav_add/fav_remove/dead_report_tip/dead_reported`，别合并）。≤640px 断点内 `.head` gap 5px + 四按钮左右 padding 收到 8px——否则 360px 窄屏内容区 304px 装不下 310px 的按钮行，留言板会被挤到第二行（CDP 实测 360/390/414 一行通过；320px 极旧设备允许换行，flex-wrap 是设计行为）。测试 12 段新增 EN `Save` 断言、12b 收藏文字切换断言、12d 源码扫描（dead 键中英+切换表达式）。记住移动端按钮行预算：按钮宽度和 ≤ 内容区宽度，加按钮先量 360px。
 - **留言板（2026-09-23，站主指令「点开后跳到单独的留言界面」）**：社区卡片新增「留言板」按钮（与举报同门控：仅云端 Store 渲染）→ 独立弹层 `openMsgBoard`（z-70，ESC/返回手势/点遮罩均可关，popstate 用 `msgPopping` 旗标防止"关板顺带关榜"）。发布闸门：AdGuard → 60s/uid 冷却 → 200 字截断；纯 textContent。**输入框不自动聚焦**（站主明确：手机上弹键盘会把板顶出屏外，让用户自己点）；板身定高 `min(75vh,640px)` + 列表区 flex 撑满（站主要求"做长一点"）；背景 backdrop blur + 入场动画（reduced-motion 全局豁免已覆盖）。入口不做成"整卡点击"——卡片主点击仍是打开外部内容（产品核心循环），别改。schema v1.6：comments 表 + note_len 约束；DDL 未执行时留言板显示加载失败（不炸主站）。
 - ~~评论功能（未实现，方案冻结）~~ **2026-09-23 已解冻上线**（形态改为"每条内容一个留言板"，见 §4.3）
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 
 ## 7. 开发经验与教训（每条都交过学费）
 
-1. **验证金字塔**：`node --check` → DOM 桩 168 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。CDP 注入注意：Node 24 内置 WebSocket 是 EventTarget 风格（`addEventListener`，没有 `.on()`）。
+1. **验证金字塔**：`node --check` → DOM 桩 170 项 → headless 截图 → CDP 交互截图。桩的盲区=HTML 结构损伤与一切视觉问题；跳过最后一步交付过一次"样例全空"事故（§3.6）。CDP 注入注意：Node 24 内置 WebSocket 是 EventTarget 风格（`addEventListener`，没有 `.on()`）。
 2. **分享卡片类功能必须静态写 head**——一切"运行时注入元数据"的方案对不执行 JS 的爬虫无效。
 3. **存储结构升级别忘了写 key**：收藏从 urlKey 字符串升级为对象时，第一版漏存 `key` 字段，读回全被丢弃——schema 变更后立刻跑真实链路测试，别只看"没报错"。
 4. **bash heredoc 反引号会吞字**：写含反引号/`$` 的内容用 `<<'EOF'`（带引号）或 python；`sed -i` 改文件后 Edit 工具会拒绝（文件状态过期），重新 Read 即可。
