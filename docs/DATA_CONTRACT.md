@@ -29,6 +29,15 @@ APP 端 Gson 反序列化：缺失字段取默认值（ratings=null 视作空、
 > 标题+URL 一起检查）；同 URL 合并时保留首条 note；云端列名 `note`（schema v1.5），DDL 未执行时网站端
 > 自动降级为无留言入库，推荐本体不失败。APP 端可暂不展示该字段（Gson 容忍缺失），展示时同样用 textContent。
 > 同一提交：网站端**内置精选样例整体下线**（站主指令），社区条目成为唯一内容源——契约结构不受影响。
+>
+> **APP 端对齐（2026-09-27）**：APP 完成同版渲染口径，与网站显示一致——
+> ① 样例精选下线（PicksRepository/relax_picks.json 删除），精选页仅展示云端社区条目 + 空态文案；
+> ② note 全链路：加载 select 列、卡片「留言」随卡展示、推荐提交框选填 ≤60 字（AdGuard 拼检）；
+> ③ 同义标签折叠 normType（§2 同表，InsomniaTypes.normType），筛选与展示共用；
+> ④ recommend_count / admin_verdict snake_case 解析修正（@SerializedName + camelCase alternate 兼容旧缓存）；
+> ⑤ 失效报警三层规则同款（§6）：站长判定优先，无判定时 bot 判死 AND ≥2 台设备人工举报；
+> ⑥ dead_badge 文案与网站同步（「多人报告 + 机器验证」/「站长核实」两档）。
+> 留言板（comments v1.6）为网站专属功能，APP 暂不对齐。
 
 ## 2. 失眠类型标签（type）
 
