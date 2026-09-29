@@ -158,6 +158,7 @@ const document = {
   createElementNS: (ns, tag) => makeEl(tag),
   createTextNode: t => ({ TEXT: true, textContent: String(t) }),
   getElementById: id => (registry[id] && !registry[id]._removed) ? registry[id] : null,
+  querySelector: sel => (sel === 'meta[name="theme-color"]') ? { setAttribute() { } } : null,   /* PWA theme-color meta：桩里给空壳即可（apply() 只 setAttribute） */
   querySelectorAll: sel => registry.list.querySelectorAll(sel).concat(
     registry.rankingOverlay.querySelectorAll(sel)).concat(
     sel.includes('.rate') ? allNodes.filter(n => n._match('.rate[aria-expanded="true"]')) : []),
@@ -192,6 +193,7 @@ const sandbox = {
   requestAnimationFrame: () => 0,
   matchMedia: () => ({ matches: false }),
   location: { search: '' },
+  navigator: {},   /* 无 serviceWorker 键 → 主站 SW 注册分支自然跳过 */
   innerWidth: 900, innerHeight: 700, devicePixelRatio: 1,
   addEventListener: () => {}, removeEventListener: () => {},
   console, setTimeout, clearTimeout, Math, Date, JSON, Set, Object, Array, Number, String, RegExp, Promise,
@@ -697,5 +699,30 @@ try { new Function(statsJs); } catch (e) { statsCompiled = e.message; }
 ok(statsCompiled === true, '/data 脚本语法编译通过（不执行）', statsCompiled);
 ok(statsHtml.includes('href="../adm/"') && statsHtml.includes('href="../"'), '/data 常驻导航：站长后台入口 + 返回主站');
 ok(statsHtml.includes('TYPE_SYNONYMS') && statsHtml.includes("'兴奋睡不着'") && statsHtml.includes('normType'), '/data 类型统计同义词折叠（兴奋睡不着→兴奋型，与主站同源）');
+
+/* ---------- 17. PWA/webAPP（2026-09-30：manifest + SW 壳缓存 + iOS 主屏三件套 + safe-area） ---------- */
+console.log('\n[17] PWA/webAPP');
+ok(html.includes('rel="manifest" href="manifest.webmanifest"'), 'index.html 挂 manifest');
+ok(html.includes('apple-mobile-web-app-capable') && html.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"') && html.includes('apple-mobile-web-app-title'), 'iOS 添加到主屏三件套（capable/状态栏/标题）');
+ok(html.includes('mobile-web-app-capable'), 'Android/Chrome legacy 主屏开关');
+ok(/name="viewport" content="[^"]*viewport-fit=cover/.test(html), 'viewport 带 viewport-fit=cover（standalone 全屏铺开前提）');
+ok(html.includes('name="theme-color" content="#1c1626"') && html.includes('meta[name="theme-color"]'), 'theme-color 静态初值 + 时辰脚本动态同步');
+ok(html.includes("'serviceWorker' in navigator") && html.includes("navigator.serviceWorker.register('sw.js')"), '主站注册 Service Worker');
+ok(html.includes('env(safe-area-inset-top') && html.includes('env(safe-area-inset-bottom') && html.includes('env(safe-area-inset-left'), '正文/榜单覆盖层 safe-area 内边距（刘海屏 standalone 不被状态栏压住）');
+const manifest = JSON.parse(readFileSync(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
+ok(manifest.start_url === './' && manifest.scope === './' && manifest.display === 'standalone' && manifest.lang === 'zh-CN', 'manifest：相对 start_url/scope（Pages 子目录兼容）+ standalone');
+ok(manifest.name.includes('电子安眠药') && manifest.short_name === '电子安眠药', 'manifest：品牌名（与站名/og:site_name 同源）');
+const mIcons = manifest.icons || [];
+ok(mIcons.some(i => i.sizes === '192x192') && mIcons.some(i => i.sizes === '512x512') && mIcons.some(i => i.purpose === 'maskable' && i.sizes === '512x512'), 'manifest 图标：192+512+maskable 齐备');
+for (const ic of mIcons) {
+  const p = new URL('../' + ic.src, import.meta.url);
+  const b = readFileSync(p);
+  ok(b.length > 100 && b.readUInt32BE(16) === parseInt(ic.sizes) && b.readUInt32BE(20) === parseInt(ic.sizes.split('x')[1]), '图标文件实际尺寸与 manifest 一致：' + ic.src);
+}
+ok(readFileSync(new URL('../assets/icons/apple-touch-icon.png', import.meta.url)).readUInt32BE(16) === 180, 'apple-touch-icon 180×180');
+const swSrc = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+ok(swSrc.includes("addEventListener('fetch'") && swSrc.includes("req.mode === 'navigate'") && swSrc.includes('url.origin !== location.origin'), 'SW：仅拦同源主站壳子导航（/adm、/data、跨域 API/字体全直连）');
+ok(swSrc.includes('scopeDir') && swSrc.includes("url.pathname === scopeDir || url.pathname === scopeDir + 'index.html'"), 'SW：壳子判定走 scope 路径（Pages 子目录 /cyberSleepingPill/ 兼容）');
+ok(!/https?:\/\//.test(swSrc), 'SW 零外链（无第三方 URL，不新增任何外部依赖）');
 
 console.log('\nALL PASS: ' + pass + ' assertions');

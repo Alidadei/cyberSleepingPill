@@ -3,3 +3,6 @@ service_role*
 *.local.txt
 *.secret
 .env
+
+# 本地验收截图（headless Chrome/CDP 产物，验证完即弃，不进仓库）
+record/

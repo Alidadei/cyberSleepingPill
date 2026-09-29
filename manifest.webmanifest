@@ -1,0 +1,17 @@
+{
+  "name": "电子安眠药 · 犯困内容打分网站",
+  "short_name": "电子安眠药",
+  "description": "致失眠焦虑刷手机的你：这里是刷着刷着能让你睡着的地方",
+  "lang": "zh-CN",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1c1626",
+  "theme_color": "#1c1626",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

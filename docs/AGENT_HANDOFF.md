@@ -1,7 +1,7 @@
 # AGENT_HANDOFF · 电子安眠药（cyberSleepingPill）开发接手指南
 
 > 写给下一个接手本项目的 AI agent。读完这一篇即可开工，不需要问用户任何背景问题。
-> 最后更新：2026-09-24（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
+> 最后更新：2026-09-30（若比当前日期旧很多，先 `git log --oneline -20` 补课再动手）。
 
 ## 0. 一句话定位
 
@@ -15,10 +15,11 @@
 ```bash
 # ① 语法：抽出内联 <script> 做语法检查
 awk '/^<script>$/{f=1;next} /^<\/script>$/{f=0} f' index.html > /tmp/s.js && node --check /tmp/s.js
-# ② 行为回归：零依赖 DOM 桩测试（当前 170 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线）
+# ② 行为回归：零依赖 DOM 桩测试（当前 188 项断言，全绿才算完；含 /adm 红线扫描与样例下线红线 + §17 PWA 断言）
 node tests/dom-test.mjs
 # ③ 本地预览（后台常驻；跨会话可能被回收，用前先 curl -o /dev/null -w "%{http_code}" http://127.0.0.1:8642/ 探活）
-python -m http.server 8642 --bind 127.0.0.1
+#    ⚠ 测 Service Worker 必须用 tools/serve.py（修正 MIME）：裸 http.server 在本机把 .js 判成 text/plain，SW 注册必 SecurityError（§7.12）
+python tools/serve.py 8642
 ```
 
 ### 1.2 真实浏览器视觉验证（两招，IAB 内置浏览器经常起不来，别依赖它）
@@ -41,10 +42,14 @@ python -m http.server 8642 --bind 127.0.0.1
 ```
 cyberSleepCommunity/
 ├── index.html                  # 单文件站全部 HTML/CSS/JS（当前 ~3000 行）
+├── manifest.webmanifest        # PWA 清单（standalone，相对 start_url/scope，图标三枚）
+├── sw.js                       # Service Worker：仅主站壳子离线兜底（网络优先，不拦 /adm、/data 与一切跨域）
 ├── adm/index.html              # 站长后台：人工判活/判死/清举报/删条目 + 留言审核（noindex，永不内嵌密钥）
 ├── data/index.html             # 数据页：画像/推荐/链接健康统计，密钥门禁 + 30 秒自刷（noindex）
-├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 170 项断言，含 admin/样例下线红线扫描）
+├── tests/dom-test.mjs          # 零依赖行为测试（vm 桩 + 结构冒烟 + 188 项断言，含 admin/样例下线红线 + PWA）
 ├── tools/link-check.mjs        # 死链巡检脚本（零依赖，GitHub Actions 每日跑；跳过站长已判定条目）
+├── tools/serve.py              # 本地预览服务器（stdlib；修正 .js/.webmanifest MIME，SW 本地测试必备）
+├── assets/icons/               # PWA 图标：icon-192/512、icon-maskable-512、apple-touch-icon(180)，与 favicon 同款 SVG 生成
 ├── .github/workflows/link-check.yml
 ├── docs/                       # DATA_CONTRACT / supabase-schema / adguard-rules / capacity-test / 本文件
 ├── assets/                     # og-cover.jpg（分享封面）+ shoushu.jpg（手书原稿）
@@ -52,7 +57,7 @@ cyberSleepCommunity/
 └── README.md
 ```
 
-**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单，**自定义标签同义词折叠**）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、推荐留言 note（契约 v1.3，卡片随卡展示）+ **每条内容一个留言板**（评论功能解冻形态）、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 /data（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单。**云端四表 live**（community_picks / user_profiles / link_reports / comments），schema v1.4–v1.6 均已执行（2026-09-23）：`admin_verdict` / `note` 列、`note_len` 约束、`comments` 留言表全部生效，后台判定、留言落库、留言板全功能；云端现有数据极少（个位数条目）。
+**已上线功能**（细节见 §6 档案）：昼夜时辰渐变主题（夜藕荷紫/昼琥珀棕，`--t` 插值）、整页星空 canvas、手写信两段式入场、类型星图节点（点击展开榜单，**自定义标签同义词折叠**）、失眠原因搜索、全站中英双语、静态 og:/canonical 分享卡片、推荐留言 note（契约 v1.3，卡片随卡展示）+ **每条内容一个留言板**（评论功能解冻形态）、收藏（书签 + 收藏页 + 与 APP 同格式导出/导入）、链接失效举报（⚠ 按钮 + ≥2 人置灰徽标 + Actions 自动巡检 + 站长后台三层判定）、数据页 /data（密钥门禁的画像/推荐/链接健康统计）、排行榜覆盖层 + 移动端返回手势、汉堡菜单、**PWA/webAPP（2026-09-30，可安装到主屏幕 + 离线兜底，见 §6 档案末条）**。**云端四表 live**（community_picks / user_profiles / link_reports / comments），schema v1.4–v1.6 均已执行（2026-09-23）：`admin_verdict` / `note` 列、`note_len` 约束、`comments` 留言表全部生效，后台判定、留言落库、留言板全功能；云端现有数据极少（个位数条目）。
 
 **有意下线的东西（不要恢复）**：导航栏 导出/导入（社区数据以云端为唯一通道，顺带堵掉了绕过 AdGuard 的批量导入口子）；网站介绍按钮（注释保留）；emoji 图标（仅历史品牌位）；**内置精选样例+示例评分（2026-09-23 站主指令整体删除，站内只展示真实社区条目）**。
 
@@ -104,6 +109,7 @@ cyberSleepCommunity/
 - **样例整体下线 + 同义词折叠 + 推荐留言（2026-09-23，站主三项指令，契约 v1.3 / schema v1.5）**：① 内置精选样例（BUILTIN 四条+示例评分+csc_sample_ratings+「APP 同款」徽章+【样例】前缀）**全部删除**——推翻 2026-09-10「每型一条样例」决定，站内只剩真实社区条目，空类型显示空态引导；测试有「无 BUILTIN/sampleRating/【样例】残留」红线，勿恢复。② 自定义标签**同义词折叠**（`TYPE_SYNONYMS` + `normType`）：写入口径（normalizeTag）与渲染口径共用一表，「兴奋睡不着」→`excitement`（站主云端真实数据里的首例同义分裂）；`/data` 数据页同源一份，类型分布不再分裂；无法归类的自由标签仍按 v1.1 原样保留。同义词表**有意不追求穷举、也绝不在运行时集成任何语义模型/API**（站主 2026-09-23：语义判定由维护 agent 离线做、模型不写死，常备流程见 §4.9）。③ 新增**推荐留言 note**（契约 v1.3 选填字段）：提交框 maxlength=60、与标题/URL/标签一起过 AdGuard、卡片「留言」居中样式展示、同 URL 合并保留首条；云端列 `note`（schema v1.5，列级 insert 授权已含），**DDL 未执行时 add 自动降级为无留言重试**（推荐本体不失败）；APP 端 Gson 容忍缺失，代码零改动。CDP 截图抓过一次 note 靠左不居中的视觉问题——卡片内容全是居中风格，新块级元素记得 `text-align:center`。同日站主手机端反馈：长标题换行时序号被 `.head` 的 `justify-content:center` 挤成独占一行居中、与短标题卡不一致 → **≤640px 断点内 .card .head 改 `flex-start` + rank 加 min-width 2.2em**；同日二轮拍板：**标题独占一行（.t flex-basis:100%），评分/收藏/举报三按钮恒同一行**（移动端排行卡统一为「序号→标题→按钮行→居中 meta→留言」结构，桌面端居中审美不变，勿"统一"回桌面）。
 - **卡片按钮全部带文字（2026-09-24，站主指令「收藏 和 网址失效反馈 两个按钮也需要文字提示」）**：收藏/失效按钮从纯图标改为「图标+文字」胶囊（收藏→已收藏、失效反馈→已反馈，EN Save→Saved、Dead link?→Reported），与 评分☆/留言板 统一 13px 胶囊族；i18n 新键 `fav_btn/fav_btn_on/dead_btn/dead_btn_done`（aria-label 仍用全文案 `fav_add/fav_remove/dead_report_tip/dead_reported`，别合并）。≤640px 断点内 `.head` gap 5px + 四按钮左右 padding 收到 8px——否则 360px 窄屏内容区 304px 装不下 310px 的按钮行，留言板会被挤到第二行（CDP 实测 360/390/414 一行通过；320px 极旧设备允许换行，flex-wrap 是设计行为）。测试 12 段新增 EN `Save` 断言、12b 收藏文字切换断言、12d 源码扫描（dead 键中英+切换表达式）。记住移动端按钮行预算：按钮宽度和 ≤ 内容区宽度，加按钮先量 360px。
 - **留言板（2026-09-23，站主指令「点开后跳到单独的留言界面」）**：社区卡片新增「留言板」按钮（与举报同门控：仅云端 Store 渲染）→ 独立弹层 `openMsgBoard`（z-70，ESC/返回手势/点遮罩均可关，popstate 用 `msgPopping` 旗标防止"关板顺带关榜"）。发布闸门：AdGuard → 60s/uid 冷却 → 200 字截断；纯 textContent。**输入框不自动聚焦**（站主明确：手机上弹键盘会把板顶出屏外，让用户自己点）；板身定高 `min(75vh,640px)` + 列表区 flex 撑满（站主要求"做长一点"）；背景 backdrop blur + 入场动画（reduced-motion 全局豁免已覆盖）。**列表区可滚动**（站主 2026-09-24 问询确认）：`overflow-y:auto` + `overscroll-behavior:contain`（滑到头不把滚动链给背后的榜单页）+ `-webkit-overflow-scrolling:touch`（老 iOS 惯性）；打开/发布后自动滚到底部最新一条（`scrollTop=scrollHeight`）。入口不做成"整卡点击"——卡片主点击仍是打开外部内容（产品核心循环），别改。schema v1.6：comments 表 + note_len 约束；DDL 未执行时留言板显示加载失败（不炸主站）。
+- **PWA/webAPP（2026-09-30，站主指令「将网站做成 webAPP 支持」）**：① **sw.js 只管一件事**——主站壳子（`index.html`）离线兜底，导航请求**网络优先**（本站更新频繁，不搞版本钉死，在线永远拿最新并顺带刷缓存），离线才回退缓存；`fetch` 处理器白名单 = 同源 + scope 路径 + `mode==='navigate'`，**/adm、/data、assets、Supabase、Google Fonts、B 站 JSONP 一概不拦不缓存**（行为与无 SW 完全一致；CDP 实测断网后 /adm 是浏览器错误页而非壳子顶替）。② **manifest 相对路径 `start_url/scope:'./'`**——GitHub Pages 子目录 `/cyberSleepingPill/` 与本地根目录两栖兼容；`display:standalone`、`id:'./'`。③ **图标与站内 favicon 同款 SVG**（夜紫 #271f36 + 藕荷月 + 双星 + Zzz）用 headless Chrome 按 512/192/512-maskable/180 四档截图产出；maskable 版全出血+内容缩 0.78 入安全区，apple-touch 全出血（iOS 自裁圆角，透明角会变黑底）。④ **iOS 三件套** `apple-mobile-web-app-capable` + `black-translucent`（星空顶到状态栏后头；代价=昼间状态栏白字压浅底对比弱，可接受待站主反馈） + `apple-mobile-web-app-title`；iOS 无安装提示，用户手动「添加到主屏幕」，站内**有意不做安装引导横幅**（无打扰红线）。⑤ **theme-color 动态同步**：时辰主题 `apply()` 末尾把插值后的 bg 写回 meta（CDP 实测 ?day=0→#1c1626、?day=1→#f4ebe4），浏览器镶边/安卓任务栏跟昼夜走。⑥ **safe-area**：viewport 加 `viewport-fit=cover`，body 上下、.wrap 左右、.hamburger 定位、.ranking-overlay 内边距全部 `calc(原值 + env(safe-area-inset-*))`——普通浏览器 env() 恒 0 零影响，只有刘海屏 standalone 全屏时撑开。⑦ 测试桩为 PWA 补了 `document.querySelector`（theme-color meta 空壳）与 `navigator:{}`（无 serviceWorker 键→注册分支自然跳过）；dom-test §17 共 18 项断言（含图标 PNG IHDR 实测尺寸、SW 零外链红线、SW 只拦壳子的源码扫描）。
 - ~~评论功能（未实现，方案冻结）~~ **2026-09-23 已解冻上线**（形态改为"每条内容一个留言板"，见 §4.3）
 - 导航 导出/导入 已下线（2026-09-17）：社区数据云端为唯一通道；附带堵住文件导入绕过 AdGuard 的口子
 
@@ -120,3 +126,4 @@ cyberSleepCommunity/
 9. **外部服务的能力边界先查证再写方案**：GitHub Sponsors 大陆不可收款、飞书不渲染 github.io 预览图、浏览器探测不了跨域死活——都查证过，别在方案里复活这些死路。
 10. **git push 到 github.com 失败按报错形态对号入座**：① `SSL_ERROR_SYSCALL` = HTTP/2 被干扰 → `git -c http.version=HTTP/1.1 push`（2026-09-17）；② `Failed to connect to 127.0.0.1 port 7890` = git 配置的代理没开，直连也会被墙（reset/timeout）——先 `netstat -an | grep LISTENING` 找实际代理端口（Clash Verge 新默认 7897，2026-09-19 实测），`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=... push` 即过。另：`git push | tail` 吞退出码，重试循环必须判断 git 本身的退出码。
 11. **免费档永远别做破坏性压测**：Supabase 前面是 Cloudflare，压测工具往死里打可能被判滥用封项目——承载问题用「真实访客级」温和模拟回答就够了（分档 1/10/30/60 并发全流程 + 100 脉冲，只读约 400 请求），方法、脚本、判读标准已沉淀 `docs/capacity-test.md`，复测直接用，别另起炉灶。
+12. **Windows 本机 `python -m http.server` 是 SW 杀手**：mimetypes 读注册表，本机把 `.js` 判成 `text/plain`，而 SW 脚本 MIME 检查是强制的 → 注册必报 `SecurityError: unsupported MIME type`（GitHub Pages 恒返 `application/javascript`，线上无碍）。且首失的 `text/plain` 响应会被 Chrome 磁盘缓存，换修 MIME 的服务器后**仍报旧错**——CDP `Network.setCacheDisabled(true)` 刷新才见真身。本地测 SW 一律 `python tools/serve.py 8642`（§1.1③），排障先 `fetch('/sw.js',{cache:'no-store'})` 看 content-type 再下结论。
