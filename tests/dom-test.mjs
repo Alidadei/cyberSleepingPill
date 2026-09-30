@@ -725,4 +725,35 @@ ok(swSrc.includes("addEventListener('fetch'") && swSrc.includes("req.mode === 'n
 ok(swSrc.includes('scopeDir') && swSrc.includes("url.pathname === scopeDir || url.pathname === scopeDir + 'index.html'"), 'SW：壳子判定走 scope 路径（Pages 子目录 /cyberSleepingPill/ 兼容）');
 ok(!/https?:\/\//.test(swSrc), 'SW 零外链（无第三方 URL，不新增任何外部依赖）');
 
+/* ---------- 18. 已安装 webAPP 更新提示（2026-09-30：HEAD 探 Last-Modified + 非模态提示条） ---------- */
+console.log('\n[18] webAPP 更新提示');
+ok(html.includes("method: 'HEAD'") && html.includes("'last-modified'") && html.includes("cache: 'no-store'"), '检测走 HEAD+Last-Modified（no-store 绕 Pages 10 分钟 HTTP 缓存）');
+ok(html.includes('csc_upd_dismiss'), '提示条可关闭且本会话不再打扰（sessionStorage 旗标）');
+ok(html.includes("upd_tip: '电子安眠药有新版本啦'") && html.includes("upd_btn: '刷新'") && html.includes("upd_close: '关闭'"), 'i18n 中文键齐（tip/btn/close）');
+ok(html.includes("upd_tip: 'A new version is up'") && html.includes("upd_btn: 'Refresh'") && html.includes("upd_close: 'Close'"), 'i18n 英文键齐（tip/btn/close）');
+ok(/checkUpdate\(\);\s*\n/.test(html) && html.includes("visibilitychange") && html.includes('30 * 60 * 1000'), '三路探测挂钩：进场 + 回前台 + 每 30 分钟');
+ok(html.includes("env(safe-area-inset-bottom") && html.includes('#updateTip'), '提示条样式带 safe-area 底距（standalone 不被小白条压住）');
+/* 功能链路：桩接管 fetch，模拟「进场记录部署时间 → 部署变了 → 弹条 → 关掉 → 沉默」 */
+let headLM = 'Mon, 29 Sep 2026 08:00:00 GMT';
+let headCalls = 0;
+sandbox.fetch = (u, o) => {
+  if (o && o.method === 'HEAD') { headCalls++; return Promise.resolve({ ok: true, headers: { get: () => headLM } }); }
+  return Promise.reject(new Error('non-head'));
+};
+sandbox.checkUpdate();
+await sleep(5);
+ok(!bodyKids.some(n => n.id === 'updateTip') && sandbox.__buildLM === 'Mon, 29 Sep 2026 08:00:00 GMT', '首探只记录部署时间，不弹条');
+headLM = 'Tue, 30 Sep 2026 07:20:31 GMT';   /* 站长 push 了新版 */
+sandbox.checkUpdate();
+await sleep(5);
+const updTip = bodyKids.find(n => n.id === 'updateTip');
+ok(updTip && updTip.children.length === 3 && ['刷新', 'Refresh'].includes(updTip.children[1].textContent), '部署时间变化 → 弹提示条（文案随当前语言词典）');
+updTip.children[1].click();   /* 桩无 location.reload → 走 guard 不炸；真实浏览器 reload 即拿最新 */
+updTip.children[2].click();
+ok(updTip._removed === true && sandbox.sessionStorage.getItem('csc_upd_dismiss') === '1', '点关闭 → 提示条移除 + 会话旗标落位');
+headCalls = 0;
+sandbox.checkUpdate();
+await sleep(5);
+ok(headCalls === 0 && !bodyKids.filter(n => n.id === 'updateTip').some(n => !n._removed), '旗标生效：关掉后本会话不再探测不再弹');
+
 console.log('\nALL PASS: ' + pass + ' assertions');

@@ -1587,6 +1587,52 @@
       margin-top: 6px;
       font-size: 12px
     }
+
+    /* 更新提示条：非模态、可关、本会话关掉不再弹（检测逻辑见启动区 checkUpdate；
+       iOS 主屏图标不受此影响——图标是平台快照，见 HANDOFF §6） */
+    #updateTip {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      max-width: min(92vw, 480px);
+      padding: 10px 12px 10px 16px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 6px 24px rgb(0 0 0 / .25);
+      font-size: 14px;
+      color: var(--ink);
+      white-space: nowrap;   /* 文案很短，单行放得下；防移动端字体放大把 span 挤成两行 */
+    }
+
+    #updateTip .upd-go {
+      flex-shrink: 0;
+      border: 1px solid var(--act);
+      background: var(--act);
+      color: #fff;
+      border-radius: 9px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer
+    }
+
+    #updateTip .upd-x {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: var(--sub);
+      font-size: 17px;
+      line-height: 1;
+      padding: 0 2px;
+      cursor: pointer;
+      font-family: inherit
+    }
   </style>
   <script>
     /* 时辰主题：按本地时间在夜/昼两套色板间连续插值。
@@ -3229,6 +3275,7 @@
         load_retrying: n => `云端加载失败，正在自动重试（第 ${n} 次）…`,
         load_fail_giveup: '已停止自动重试，请手动刷新',
         sister_app: '姊妹应用：', sister_name: '睡眠站台 (Android)',
+        upd_tip: '电子安眠药有新版本啦', upd_btn: '刷新', upd_close: '关闭',
         letter_caption: '站长手书 · 上海 2026.9.10 凌晨 · 点击任意处关闭', letter_alt: '站长手书引言原稿（2026.9.10 凌晨）',
         intro_hint: '轻触任意处显示全文', intro_hint_enter: '再按一次进入网站', intro_sign: '—— 上海 2026.9.10. 1:49',
         intro_paras: [
@@ -3301,6 +3348,7 @@
         load_retrying: n => `Failed to load, auto-retrying (attempt ${n})…`,
         load_fail_giveup: 'Retries stopped, please refresh manually',
         sister_app: 'Sister app: ', sister_name: 'Sleep Station (Android)',
+        upd_tip: 'A new version is up', upd_btn: 'Refresh', upd_close: 'Close',
         letter_caption: 'The founder\'s handwritten note · Shanghai, Sep 10 2026, before dawn · tap anywhere to close', letter_alt: 'Photo of the founder\'s handwritten introduction',
         intro_hint: 'Tap anywhere to reveal the letter', intro_hint_enter: 'Tap again to enter', intro_sign: '— Shanghai, 1:49 AM, Sep 10, 2026',
         intro_paras: [
@@ -3571,6 +3619,51 @@
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       navigator.serviceWorker.register('sw.js').catch(() => { });
     }
+    /* ================= 更新提示（已安装 webAPP / 长开页面，站主 2026-09-30） =================
+       本站常被整夜挂后台，部署新版后旧页面仍跑旧 JS。HEAD 探 index.html 的
+       Last-Modified（GitHub Pages 部署即变；no-store 绕开 max-age=600；静态请求不耗
+       Supabase egress；SW 只拦 navigate，HEAD 直连不受缓存影响）。与本次加载时记录
+       的值不同 = 站长部署过新版 → 底部弹非模态提示条，点「刷新」reload 后网络优先
+       自然拿最新。关掉则本会话不再打扰。iOS 主屏图标不在此列（平台快照，换不动）。 */
+    function showUpdateTip() {
+      if (document.getElementById('updateTip')) return;
+      const bar = document.createElement('div');
+      const msg = document.createElement('span');
+      msg.textContent = t('upd_tip');
+      const go = document.createElement('button');
+      go.className = 'upd-go';
+      go.textContent = t('upd_btn');
+      go.onclick = () => { if (location.reload) location.reload(); };
+      const x = document.createElement('button');
+      x.className = 'upd-x';
+      x.textContent = '×';
+      x.setAttribute('aria-label', t('upd_close'));
+      x.onclick = () => {
+        try { sessionStorage.setItem('csc_upd_dismiss', '1'); } catch (e) { }
+        bar.remove();
+      };
+      bar.id = 'updateTip';
+      bar.appendChild(msg);
+      bar.appendChild(go);
+      bar.appendChild(x);
+      document.body.appendChild(bar);
+    }
+    function checkUpdate() {
+      try { if (sessionStorage.getItem('csc_upd_dismiss')) return; } catch (e) { }
+      fetch(location.pathname, { method: 'HEAD', cache: 'no-store' })
+        .then((r) => {
+          if (!r || !r.ok) return;
+          const lm = r.headers.get('last-modified') || '';
+          if (!lm) return;
+          if (!window.__buildLM) { window.__buildLM = lm; return; }   /* 首探：记录进场时的部署时间 */
+          if (lm !== window.__buildLM) showUpdateTip();               /* 变了 = 部署过新版 */
+        })
+        .catch(() => { });
+    }
+    /* 三路探测：进场 + 回前台（挂后台的 webAPP 重见天日时） + 每 30 分钟；失败静默 */
+    checkUpdate();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
+    setInterval(checkUpdate, 30 * 60 * 1000);
   </script>
 </body>
 
